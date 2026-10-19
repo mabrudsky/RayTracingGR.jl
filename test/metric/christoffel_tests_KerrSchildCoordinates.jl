@@ -3,14 +3,18 @@ import Test: @testset, @test
 import ForwardDiff: Dual, Partials, partials
 import StaticArrays: SVector, @SVector, @SArray, @MArray
 using BenchmarkTools
-
-# function fmt_time(t)
-    # t < 1e-6 && return string(round(t * 1e9, digits=1), " ns")
-    # t < 1e-3 && return string(round(t * 1e6, digits=2), " μs")
-    # t < 1    && return string(round(t * 1e3, digits=2), " ms")
-    # return string(round(t, digits=3), " s")
-# end
-
+#=
+"""
+ES: `&&` ejecuta el return si la condición es VERDADERA. `||` ejecuta el return si la condición es FALSA.
+EN: `&&` runs the return if the condition is TRUE. `||` runs the return if the condition is FALSE.
+"""
+function fmt_time(t)
+    t < 1e-6 && return string(round(t * 1e9, digits=1), " ns")
+    t < 1e-3 && return string(round(t * 1e6, digits=2), " μs")
+    t < 1    && return string(round(t * 1e3, digits=2), " ms")
+    return string(round(t, digits=3), " s")
+end
+=#
     function covariant_derivative_metric(k, u::SVector{4,T}) where T
         Γ = christoffel(k, u)
         g = metric(k, u)
@@ -19,17 +23,6 @@ using BenchmarkTools
         gd = metric(k, xd)
         ∂g = partials.(gd)
 
-        #∇g = @MArray zeros(T, 4, 4, 4)
-        #=
-        for σ in 1:4, μ in 1:4, ν in 1:4
-            s = ∂g[μ, ν][σ]
-            for ρ in 1:4
-                s -= Γ[σ, μ, ρ] * g[ρ, ν]
-                s -= Γ[σ, ν, ρ] * g[μ, ρ]
-            end
-            ∇g[σ, μ, ν] = s
-        end
-        =#
         # ES: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, devuelto como SArray inmutable.
         # EN: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, returned as an immutable SArray.
         return @SArray T[∂g[μ, ν][σ] - sum(Γ[σ, μ, :] .* g[:, ν]) - sum(Γ[σ, ν, :] .* g[μ, :])
@@ -50,7 +43,7 @@ using BenchmarkTools
     print("∇g0: "); ∇g0 = @btime covariant_derivative_metric($spacetime, $u0)
     print("∇g1: "); ∇g1 = @btime covariant_derivative_metric($spacetime, $u1)
     print("∇g2: "); ∇g2 = @btime covariant_derivative_metric($spacetime, $u2)
-    println("===============================================")
+    println("===================================================")
     # Verify that the maximum value of |∇g| is zero within floating-point tolerance
     @test maximum(abs.(∇g0)) ≈ 0 atol=1e-12  # Equivalent to @test isapprox(maximum(abs.(∇g0)), 0; atol=1e-12)
     println("Maximum value of |∇g0|: ", maximum(abs.(∇g0)))
