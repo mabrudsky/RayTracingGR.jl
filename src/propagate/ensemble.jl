@@ -24,3 +24,4 @@ function _Ensemble_Problem(configuration::Configuration{N,T,S,E,B,M}, ::Parallel
     output_func = (sol, ctx) -> (sol.u[end], false)
     return DE.EnsembleProblem(prob, prob_func=prob_func, output_func=output_func, safetycopy=false)
 end
+
