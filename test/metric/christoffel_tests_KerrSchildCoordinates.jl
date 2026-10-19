@@ -1,12 +1,12 @@
 using RayTracingGR
+using BenchmarkTools
 import Test: @testset, @test
 import ForwardDiff: Dual, Partials, partials
 import StaticArrays: SVector, @SVector, @SArray, @MArray
-using BenchmarkTools
 #=
 """
-ES: `&&` ejecuta el return si la condición es VERDADERA. `||` ejecuta el return si la condición es FALSA.
-EN: `&&` runs the return if the condition is TRUE. `||` runs the return if the condition is FALSE.
+   ES: `&&` ejecuta el return si la condición es VERDADERA. `||` ejecuta el return si la condición es FALSA.
+   EN: `&&` runs the return if the condition is TRUE. `||` runs the return if the condition is FALSE.
 """
 function fmt_time(t)
     t < 1e-6 && return string(round(t * 1e9, digits=1), " ns")
