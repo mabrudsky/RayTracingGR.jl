@@ -1,3 +1,6 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 RayTracing = "4b51895e-7621-4f2b-bab6-efc159b47762"
+
+[compat]
+Documenter = "1.19.0"
