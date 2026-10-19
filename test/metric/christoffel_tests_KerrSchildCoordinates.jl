@@ -15,23 +15,18 @@ function fmt_time(t)
     return string(round(t, digits=3), " s")
 end
 =#
-    function covariant_derivative_metric(k, u::SVector{4,T}) where T
-        Γ = christoffel(k, u)
-        g = metric(k, u)
+function covariant_derivative_metric(k, u::SVector{4,T}) where T
+    Γ = christoffel(k, u)
+    g = metric(k, u)
 
-        xd = SVector{4, Dual{Nothing,T,4}}(ntuple(i -> Dual{Nothing,T,4}(u[i], Partials(ntuple(j -> T(i == j), 4))), 4))
-        gd = metric(k, xd)
-        ∂g = partials.(gd)
+    xd = SVector{4, Dual{Nothing,T,4}}(ntuple(i -> Dual{Nothing,T,4}(u[i], Partials(ntuple(j -> T(i == j), 4))), 4))
+    gd = metric(k, xd)
+    ∂g = partials.(gd)
 
-        # ES: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, devuelto como SArray inmutable.
-        # EN: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, returned as an immutable SArray.
-        return @SArray T[∂g[μ, ν][σ] - sum(Γ[σ, μ, :] .* g[:, ν]) - sum(Γ[σ, ν, :] .* g[μ, :])
-                         for σ in 1:4, μ in 1:4, ν in 1:4]
-        #return ∇g
-    end
-
-
-
+    # ES: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, devuelto como SArray inmutable.
+    # EN: ∇_σ g_{μν} = ∂_σ g_{μν} - Γ^ρ_{σμ} g_{ρν} - Γ^ρ_{σν} g_{μρ}, returned as an immutable SArray.
+    return @SArray T[∂g[μ, ν][σ] - sum(Γ[σ, μ, :] .* g[:, ν]) - sum(Γ[σ, ν, :] .* g[μ, :]) for σ in 1:4, μ in 1:4, ν in 1:4]
+end
 
 @testset "Christoffel symbols - KerrSchildCoordinates" begin
     # Test case: Verify that the covariant derivative of the metric is zero for KerrSchildCoordinates
