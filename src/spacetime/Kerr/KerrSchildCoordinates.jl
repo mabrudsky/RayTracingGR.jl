@@ -2,13 +2,18 @@
 # Kerr parameters (Kerr-Schild metric,     #  
 # Cartesian coordinates q = (t, x, y, z))  #
 # ======================================== #
-@with_kw struct KerrSchildCoordinates{T<:Union{Float32,Float64}} <: AbstractKerrSpacetime
+struct KerrSchildCoordinates{T<:Union{Float32,Float64}} <: AbstractKerrSpacetime
     M::T
     a::T
-    topology::CartesianCoordinate = CartesianCoordinate()
-    @assert M >= zero(T) "M must be non-negative"
-    @assert abs(a) <= M "|a| must be smaller than M"
+    topology::CartesianCoordinate
+    function KerrSchildCoordinates{T}(M, a) where {T}
+        M >= zero(T) || throw(ArgumentError("M must be non-negative"))
+        abs(a) <= M  || throw(ArgumentError("|a| must be ≤ M"))
+        return new{T}(M, a, CartesianCoordinate())
+    end
 end
+KerrSchildCoordinates(M::T, a::T) where {T<:Union{Float32,Float64}} = KerrSchildCoordinates{T}(M, a)  # positional: KerrSchildCoordinates(1.0, 0.5)
+KerrSchildCoordinates(; M, a) = KerrSchildCoordinates(M, a)                                            # keywords:   KerrSchildCoordinates(M=1.0, a=0.5)
 KerrSchildCoordinates(M::Real, a::Real) = throw(ArgumentError("Spacetime parameters must be Float32 or Float64 (both the same type); got M::$(typeof(M)), a::$(typeof(a))."))
 
 # =============================================================================== # 
