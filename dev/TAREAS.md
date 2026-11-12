@@ -68,3 +68,4 @@ Detalle en REVISION_2026-11-12.md §17–21.
 - 2026-11-12: Aplicado #1 en `src/spacetime/Kerr/KerrSchildCoordinates.jl` (constructores explícitos: `{T}(M,a)` con validación por `throw`, posicional `(M::T, a::T)`, keywords `(; M, a)`, fallback `(::Real, ::Real)` con error claro). Se mantiene `KerrSchildCoordinates(M=1.0, a=0.5)`. Test existente OK con `julia --project=. test/runtests.jl`: 3/3 pass, |∇g| máx ~1.7e-16, 0 alocaciones. Sin cambios en tests.
 - 2026-11-12: README reescrito (estructura, diagramas de carpetas/includes/flujo/tipos, convenciones, sección Pendientes). Al cambiar tareas, mantener sincronizada la sección "Pendientes" del README con este archivo.
 - 2026-11-12: Agregado Bloque 6 (#17–#21, tests de validación de AD y métricas) a pedido del usuario. Solo registrado, no implementado.
+- 2026-11-12: Commit `fcd4edc` en la rama `revision-2026-11-12` (constructor #1, README, dev/). Mergeado a `main` (fast-forward).
