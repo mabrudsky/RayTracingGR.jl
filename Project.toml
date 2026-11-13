@@ -1,7 +1,7 @@
 name = "RayTracingGR"
 uuid = "4b51895e-7621-4f2b-bab6-efc159b47762"
 version = "0.1.0"
-authors = ["Abrudsky Martín Ezequiel <mabrudsky07@email.com>"]
+authors = ["Abrudsky Martín Ezequiel <mabrudsky07@gmail.com>"]
 
 [deps]
 DiffEqGPU = "071ae1c0-96b5-11e9-1965-c90190d839ea"

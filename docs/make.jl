@@ -5,7 +5,7 @@ DocMeta.setdocmeta!(RayTracingGR, :DocTestSetup, :(using RayTracingGR); recursiv
 
 makedocs(;
     modules=[RayTracingGR],
-    authors="Abrudsky Martín Ezequiel <mabrudsky07@email.com>",
+    authors="Abrudsky Martín Ezequiel <mabrudsky07@gmail.com>",
     sitename="RayTracingGR.jl",
     format=Documenter.HTML(;
         canonical="https://mabrudsky.github.io/RayTracingGR.jl",

@@ -14,7 +14,8 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho
 
 ## Revisión 2026-11-12 (orden sugerido)
 
-### Bloque 1 — Bugs ✅ COMPLETO (2026-11-12 / 2026-11-13)
+<details>
+<summary><b>Bloque 1: Bugs ✅ completo (2026-11-12 / 2026-11-13)</b></summary>
 
 **#1 — `KerrSchildCoordinates(1.0, 0.5)` siempre daba error** (commit `fcd4edc`)
 
@@ -65,7 +66,7 @@ Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de K
 | `src/propagate/equations.jl` | Firmas `SVector{8,T}` (geodésica) y `SVector{16,T}` (transporte paralelo). |
 | `src/propagate/ensemble.jl` | `state_length(eq)` (8 / 16) + chequeo en `Ensemble_Problem`. |
 
-**#5 — Mezcla silenciosa de Float32 / Float64** (commit de este cambio)
+**#5 — Mezcla silenciosa de Float32 / Float64** (commit `9abbe00`)
 
 | Archivo | Cambio |
 |---|---|
@@ -73,6 +74,14 @@ Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de K
 | `src/spacetime/Kerr/Kerr.jl` | `numtype` agregado al `import`. |
 | `src/spacetime/Kerr/KerrSchildCoordinates.jl` | `numtype(::KerrSchildCoordinates{T}) where {T} = T`. |
 | `src/propagate/ensemble.jl` | Chequeo `numtype(spacetime) === T` en `Ensemble_Problem`. |
+
+**Qué detecta ahora `Ensemble_Problem` antes de integrar**
+
+| Error de configuración | Mensaje |
+|---|---|
+| Largo de `u0` distinto al de la ecuación | `DimensionMismatch: ParallelTransportEquationsVacuum needs u0 of length 16, got 8` |
+| Precisión distinta entre el espacio-tiempo y `u0` | `ArgumentError: spacetime uses Float64 but u0 uses Float32; use the same precision ...` |
+| Filas de `initial_data` ≠ largo de `u0` | `DimensionMismatch` (ya existía) |
 
 **Verificación final del bloque** (test existente 3/3 + chequeo manual no agregado al repo)
 
@@ -85,25 +94,94 @@ Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de K
 | Espacio-tiempo Float64 + `u0` Float32 (y viceversa) | ❌ `ArgumentError` claro |
 | Lado derecho Float32 | ✅ resultado Float32, 0 alocaciones (148 ns) |
 
-### Bloque 2 — Dependencias ✅ COMPLETO (2026-11-13)
-- [x] #12 Reemplazar `DifferentialEquations` por `SciMLBase` (compat `3.50`) — `Project.toml`, `src/RayTracingGR.jl` (`import SciMLBase`), `src/propagate/ensemble.jl` (`DE.` → `SciMLBase.`)
-- [x] #13 `BenchmarkTools` solo en tests — `[extras]` + `[targets] test = ["Test", "BenchmarkTools"]`; compat se mantiene. Correr tests con `Pkg.test()`.
-- [x] #14 Quitar `Parameters`; `import KernelAbstractions as KA` — `Project.toml`, `src/RayTracingGR.jl`, `src/spacetime/Kerr/Kerr.jl` (`using Parameters` borrado), `config_types.jl` (`Base.@kwdef`, `KA.Backend`), `ensemble.jl` (`KA.Backend` en las 3 firmas)
-  - Nota (histórica): tras #1, `KerrSchildCoordinates` ya no usa `@with_kw`; el `using Parameters` de `src/spacetime/Kerr/Kerr.jl` quedó sin uso. `Configuration`/`IntegrationParameters` (config_types.jl) todavía usan `@with_kw` → pasar a `Base.@kwdef`.
+</details>
 
-### Bloque 3 — Estructura
-- [ ] #9 Unificar `_Ensemble_Problem` con `rhs(...)`; tipos a `propagate_types.jl`
-- [ ] #10 Submódulo `kerr` → `Kerr`, exportar `KerrSchildCoordinates`, limpiar imports/exports
-- [ ] #11 Fallbacks genéricos `christoffel` / `metric_inverse`; quitar `AbstractChristoffel`
+<details>
+<summary><b>Bloque 2: Dependencias ✅ completo (2026-11-13)</b></summary>
 
-### Bloque 4 — GPU
-- [ ] #6 Contracción directa de Γ (`_metric_derivatives`, `_contract`) + test de comparación
-- [ ] #7 `ntuple(f, Val(4))`
-- [ ] #8 `save_everystep=false, save_start=false`; `initial_data` como `Matrix` de CPU
+**#12. `DifferentialEquations` → `SciMLBase`** (commit `024b515`)
 
-### Bloque 5 — Tests y orden
-- [ ] #15 Benchmarks a `benchmark/`; tests isbits, `@allocated == 0`, Float32
-- [ ] #16 Callback de terminación; mover `.md` de `src/` a `docs/`; sacar `utils_config_path.jl`; renombrar `k` → `st`
+La librería solo usa `ODEProblem`, `EnsembleProblem` y `remake`, que están en `SciMLBase`.
+`DifferentialEquations` instalaba además todos los solvers de CPU (`OrdinaryDiffEq` y otros), que no se
+usan: los solvers de GPU vienen en `DiffEqGPU`.
+
+| Archivo | Cambio |
+|---|---|
+| `Project.toml` | `SciMLBase` (compat `3.50`) en lugar de `DifferentialEquations`. |
+| `src/RayTracingGR.jl` | `import DifferentialEquations as DE` → `import SciMLBase`. |
+| `src/propagate/ensemble.jl` | `DE.ODEProblem`, `DE.remake`, `DE.EnsembleProblem` → `SciMLBase.…` |
+
+**#13. `BenchmarkTools` solo en tests** (commits `024b515` y `d702886`)
+
+| Archivo | Cambio |
+|---|---|
+| `Project.toml` | `BenchmarkTools` pasa de `[deps]` a `[extras]`; `[targets] test = ["Test", "BenchmarkTools"]`. |
+
+Los tests ahora se corren con `Pkg.test()`:
+
+| Comando | Antes | Ahora |
+|---|---|---|
+| `julia --project=. -e 'using Pkg; Pkg.test()'` | ✅ | ✅ |
+| `julia --project=. test/runtests.jl` | ✅ | ❌ no encuentra `BenchmarkTools` |
+
+**#14. Quitar `Parameters` y `import KernelAbstractions as KA`** (commit `024b515`)
+
+| Archivo | Cambio |
+|---|---|
+| `Project.toml` | Se quitó `Parameters`. |
+| `src/RayTracingGR.jl` | Sin `import Parameters: @with_kw`; `using KernelAbstractions` → `import KernelAbstractions as KA`. |
+| `src/spacetime/Kerr/Kerr.jl` | Se borró `using Parameters` (sin uso desde el #1). |
+| `src/configuration/config_types.jl` | `@with_kw` → `Base.@kwdef`; `B <: KA.Backend`. |
+| `src/propagate/ensemble.jl` | `B <: KA.Backend` en las tres firmas. |
+
+`using KernelAbstractions` traía todos los nombres del paquete (`CPU`, `@kernel`, `synchronize`, ...)
+dentro de la librería, aunque solo se usa el tipo `Backend`. Con `import ... as KA` no se trae ningún
+nombre suelto y se escribe `KA.Backend`, que es el mismo tipo. El backend se sigue eligiendo igual
+desde el script del usuario:
+
+```julia
+using RayTracingGR
+using KernelAbstractions   # CPU()   — o: using CUDA → CUDABackend()
+
+cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.GeodesicEquationsVacuum(),
+                                 backend = CPU(), u0 = u0, tspan = (0.0, 1.0))
+```
+
+Único cambio visible: si falta un campo al construir `Configuration`, el error ahora es
+`UndefKeywordError: keyword argument 'u0' not assigned`.
+
+</details>
+
+<details>
+<summary><b>Bloque 3: Estructura</b></summary>
+
+- [ ] #9 Unificar los dos `_Ensemble_Problem` con una función `rhs(...)`; mover los tipos de
+  ecuaciones a `propagate_types.jl`.
+- [ ] #10 Renombrar el submódulo `kerr` → `Kerr`, exportar `KerrSchildCoordinates` y limpiar
+  imports y exports redundantes.
+- [ ] #11 Fallbacks genéricos de `christoffel` y `metric_inverse`; eliminar `AbstractChristoffel`.
+
+</details>
+
+<details>
+<summary><b>Bloque 4: GPU</b></summary>
+
+- [ ] #6 Contraer Γ^λ_{μν}u^μv^ν directamente, sin construir el Γ completo (menos registros y
+  operaciones).
+- [ ] #7 `ntuple(f, 4)` → `ntuple(f, Val(4))`.
+- [ ] #8 Resolver con `save_everystep=false, save_start=false`; `initial_data` tiene que ser una
+  `Matrix` de CPU.
+
+</details>
+
+<details>
+<summary><b>Bloque 5: Tests y orden</b></summary>
+
+- [ ] #15 Mover los benchmarks a `benchmark/`; tests de isbits, `@allocated == 0` y Float32.
+- [ ] #16 Callback de terminación (horizonte / radio máximo); mover `src/Document` a `docs/`; sacar
+  `utils_config_path.jl`; renombrar `k` → `st` en `_christoffel_ForwardDiff`.
+
+</details>
 
 ---
 
@@ -140,6 +218,12 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 - [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Idea: `solve(ep, GPUTsit5(), DiffEqGPU.EnsembleGPUKernel(configuration.backend); ...)`.
 
+- [ ] (2026-11-13, para: sin fecha) **Sección "Cómo citar" del README**: está oculta en un comentario HTML (`<!-- ... -->`). `CITATION.bib` ya corregido (versión `v0.1.0`, email `@gmail.com`); falta decidir cuándo mostrarla (descomentar).
+
+### Propuestas en evaluación (no confirmadas)
+- `Configuration`: `tspan::Tuple{T,T}` no convierte tipos; `(0.0, 100)` da un `MethodError`. Hay que
+  decidir entre documentarlo o agregar una conversión.
+
 ---
 
 ## Historial de sesiones
@@ -165,3 +249,5 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #14 aplicado. `Pkg.resolve()` + `Pkg.test()` 3/3 OK, 0 alocaciones. Chequeo manual: `KA.Backend === KernelAbstractions.Backend`; `Configuration` por keywords con `CPU()` OK (Float64 geodésica y Float32 transporte paralelo → `EnsembleProblem`); backend inválido → `MethodError`; campo faltante → `UndefKeywordError`; `IntegrationParameters` isbits. `Parameters` ya no se carga. Bloque 2 completo.
 - 2026-11-13: README: Bloque 2 documentado con tablas (como el Bloque 1). Nuevo estilo fijado por el usuario: `#` secciones, `##` subsecciones, bloques de Pendientes como desplegables `<details>` con título en negrita. Commit del Bloque 2 + push (WSL). Pendiente menor: la sección Tests del README todavía muestra `test/runtests.jl` (ya no funciona tras #13).
 - 2026-11-13: README sección Tests: se quitó `julia --project=. test/runtests.jl` (no funciona tras #13); queda solo `Pkg.test()`.
+- 2026-11-13: Reorganización de la documentación: README para usuarios (instalación, uso, convenciones, principios, estructura del proyecto con sus diagramas, citar, licencia); `CONTRIBUTING.md` nuevo con agregar espacio-tiempo y tests; los Bloques (desplegables) y las propuestas pasaron de README a este archivo, que ahora es el único lugar de pendientes (ya no hay que sincronizar con el README). `dev/` se queda en el repositorio público.
+- 2026-11-13: Sección "Cómo citar" oculta en el README (comentario HTML). Email corregido a `@gmail.com` en `CITATION.bib`, `LICENSE`, `Project.toml` y `docs/make.jl`; versión de `CITATION.bib` → `v0.1.0`. Commit + push.
