@@ -53,12 +53,39 @@ ginv = metric_inverse(st, x)  # g^{μν}    :: SMatrix{4,4}
 
 | Elemento | Convención |
 |---|---|
-| Signatura | (−, +, +, +) |
-| Coordenadas de Kerr-Schild | `x = (t, x, y, z)` |
-| Métrica | g_{μν} = η_{μν} + 2H l_μ l_ν, con l_μ = (1, l_x, l_y, l_z) |
-| Christoffel | `Γ[μ, ν, λ] = Γ^λ_{μν}` (índice superior en la **última** posición) |
-| Estado de una geodésica | `u = (x⁰..x³, k⁰..k³)`: 8 componentes |
-| Estado con transporte paralelo | `u = (x, k, eₓ, e_y)`: 16 componentes |
+| Signatura | $(-,+,+,+)$ |
+| Coordenadas de Kerr-Schild | $x^\mu = (t, x, y, z)$ |
+| Christoffel | `Γ[μ, ν, λ]` $= \Gamma^{\lambda}{}_{\mu\nu}$ (índice superior en la **última** posición) |
+| Estado de una geodésica | $u = (x^\mu, k^\mu)$: 8 componentes |
+| Estado con transporte paralelo | $u = (x^\mu, k^\mu, e_x^\mu, e_y^\mu)$: 16 componentes |
+
+**Métrica de Kerr en coordenadas de Kerr-Schild**
+
+$$
+g_{\mu\nu} = \eta_{\mu\nu} + 2H\, l_\mu l_\nu,
+\qquad
+g^{\mu\nu} = \eta^{\mu\nu} - 2H\, l^\mu l^\nu,
+\qquad
+\eta_{\mu\nu} = \mathrm{diag}(-1, 1, 1, 1)
+$$
+
+con
+
+$$
+H = \frac{M r^3}{r^4 + a^2 z^2},
+\qquad
+l_\mu = \left(1,\ \frac{r x + a y}{r^2 + a^2},\ \frac{r y - a x}{r^2 + a^2},\ \frac{z}{r}\right),
+\qquad
+l^\mu = \eta^{\mu\nu} l_\nu = \left(-1,\ l_x,\ l_y,\ l_z\right)
+$$
+
+donde $r$ es el radio de Kerr, definido implícitamente por
+
+$$
+r^2 = \frac{1}{2}\left(\rho^2 - a^2\right) + \sqrt{\frac{1}{4}\left(\rho^2 - a^2\right)^2 + a^2 z^2},
+\qquad
+\rho^2 = x^2 + y^2 + z^2 .
+$$
 
 ---
 
@@ -179,8 +206,10 @@ AbstractChristoffel
 1. Crear `src/spacetime/<Familia>/<Familia>.jl` con un `module`, que importe desde
    `..RayTracingGR` los tipos abstractos y las funciones `metric`, `metric_inverse` y `christoffel`.
 2. En un archivo aparte, definir el struct (isbits, parametrizado en `T<:Union{Float32,Float64}`) y
-   los métodos `metric(st, x::SVector{4,T})`, `metric_inverse(...)` y `christoffel(...)`.
-   `metric` tiene que aceptar un `T` genérico, porque recibe números `Dual`.
+   los métodos `metric(st, x::SVector{4,T})`, `metric_inverse(...)`, `christoffel(...)` y
+   `numtype(::MiEspacioTiempo{T}) where {T} = T`. `metric` tiene que aceptar un `T` genérico, porque
+   recibe números `Dual`. `Ensemble_Problem` usa `numtype` para comprobar que la precisión coincida
+   con la de `u0`.
 3. Incluirlo en `src/spacetime/spacetime.jl` y exportarlo desde `src/RayTracingGR.jl`.
 
 ---
@@ -207,16 +236,73 @@ La lista viva, con fechas e historial, está en [`dev/TAREAS.md`](dev/TAREAS.md)
 código propuesto de cada punto están en [`dev/REVISION_2026-11-12.md`](dev/REVISION_2026-11-12.md).
 El número `#N` remite a esa revisión.
 
-### Bloque 1: Bugs
-- [x] #1 Constructor posicional `KerrSchildCoordinates(1.0, 0.5)`: corregido sin `@with_kw`.
-- [x] #2 `Configuration` no se podía construir: se eliminó el campo `model` redundante, porque la
-  física la define el tipo de ecuación.
-- [x] #3 `AbstractCoordinate` ahora cuelga de `AbstractRayTracing` y no de `AbstractSpacetime`. El
-  campo `topology` se conserva: indica el sistema de coordenadas para futuras variantes de Kerr y para
-  los callbacks.
-- [x] #4 La dimensión `N` quedó ligada a la ecuación: firmas `SVector{8}` / `SVector{16}`, y
-  `state_length` con un chequeo en `Ensemble_Problem`.
-- [ ] #5 Evitar la mezcla silenciosa de precisión entre el espacio-tiempo y `u0` (`numtype` + chequeo).
+### Bloque 1: Bugs ✅ completo
+
+**#1. `KerrSchildCoordinates(1.0, 0.5)` siempre daba error**
+
+Causa: antes había solo dos formas de crear el objeto.
+
+| Llamada | Qué hacía |
+|---|---|
+| `KerrSchildCoordinates(M=1.0, a=0.5)` (con nombres) | ✅ creaba el objeto |
+| `KerrSchildCoordinates(M, a)` (sin nombres, con cualquier número) | ❌ mostraba un error |
+
+La segunda estaba pensada para rechazar valores de tipo inválido, por ejemplo `Int`. Pero como era la
+única forma sin nombres, también rechazaba `KerrSchildCoordinates(1.0, 0.5)`, que es válida.
+
+Corrección: se agregó la forma sin nombres para `Float32` y `Float64`.
+
+| Llamada | Antes | Ahora |
+|---|---|---|
+| `KerrSchildCoordinates(M=1.0, a=0.5)` | ✅ | ✅ |
+| `KerrSchildCoordinates(1.0, 0.5)` | ❌ error (bug) | ✅ |
+| `KerrSchildCoordinates(1, 0.5)` | ❌ error | ❌ error (correcto: `Int` no está permitido) |
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/Kerr/KerrSchildCoordinates.jl` | Constructores explícitos sin `@with_kw`: posicional, con keywords y error claro para tipos inválidos. Se conserva `topology`. |
+
+**#2. `Configuration` no se podía construir**
+
+| Archivo | Cambio |
+|---|---|
+| `src/RayTracing_types.jl` | Se eliminó `AbstractPhysicalModel`. |
+| `src/configuration/config_types.jl` | Se eliminó el campo `model` de `Configuration` e `IntegrationParameters`. |
+| `src/propagate/ensemble.jl` | `IntegrationParameters(spacetime)`. |
+
+La física la define el tipo de ecuación (`GeodesicEquationsVacuum`).
+
+**#3. Un sistema de coordenadas era un subtipo de espacio-tiempo**
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/spacetime_types.jl` | `AbstractCoordinate <: AbstractRayTracing`. |
+
+El campo `topology` se conserva para futuros sistemas de coordenadas y para los callbacks.
+
+**#4. El largo de `u0` no estaba ligado a la ecuación**
+
+| Archivo | Cambio |
+|---|---|
+| `src/propagate/equations.jl` | Firmas `SVector{8,T}` (geodésica) y `SVector{16,T}` (transporte paralelo). |
+| `src/propagate/ensemble.jl` | `state_length(eq)` y chequeo en `Ensemble_Problem`. |
+
+**#5. Mezcla silenciosa de Float32 y Float64**
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/spacetime.jl` | Declaración `function numtype end`. |
+| `src/spacetime/Kerr/Kerr.jl` | `numtype` agregado al `import`. |
+| `src/spacetime/Kerr/KerrSchildCoordinates.jl` | `numtype(::KerrSchildCoordinates{T}) = T`. |
+| `src/propagate/ensemble.jl` | Chequeo de precisión en `Ensemble_Problem`. |
+
+**Qué detecta ahora `Ensemble_Problem` antes de integrar**
+
+| Error de configuración | Mensaje |
+|---|---|
+| Largo de `u0` distinto al de la ecuación | `DimensionMismatch: ParallelTransportEquationsVacuum needs u0 of length 16, got 8` |
+| Precisión distinta entre el espacio-tiempo y `u0` | `ArgumentError: spacetime uses Float64 but u0 uses Float32; use the same precision ...` |
+| Filas de `initial_data` ≠ largo de `u0` | `DimensionMismatch` (ya existía) |
 
 ### Bloque 2: Dependencias
 - [ ] #12 Reemplazar `DifferentialEquations` por `SciMLBase` (compat `3.50`). Compila mucho menos.

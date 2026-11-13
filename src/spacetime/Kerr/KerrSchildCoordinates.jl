@@ -16,6 +16,8 @@ KerrSchildCoordinates(M::T, a::T) where {T<:Union{Float32,Float64}} = KerrSchild
 KerrSchildCoordinates(; M, a) = KerrSchildCoordinates(M, a)                                            # keywords:   KerrSchildCoordinates(M=1.0, a=0.5)
 KerrSchildCoordinates(M::Real, a::Real) = throw(ArgumentError("Spacetime parameters must be Float32 or Float64 (both the same type); got M::$(typeof(M)), a::$(typeof(a))."))
 
+numtype(::KerrSchildCoordinates{T}) where {T} = T   # precision of the parameters (checked against u0 in Ensemble_Problem)
+
 # =============================================================================== # 
 # Internal auxiliary (not exported): calculates the scalar H and the null vector  #
 # l, shared between metric() and metric_inverse().                                #

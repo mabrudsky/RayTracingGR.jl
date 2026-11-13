@@ -7,6 +7,7 @@ state_length(::ParallelTransportEquationsVacuum) = 16
 #-------------------------------------------------------------------------
 function Ensemble_Problem(configuration::Configuration{N,T,S,E,B}, initial_data::AbstractMatrix) where {N, T <: Union{Float32,Float64}, S <: AbstractSpacetime, E <: AbstractEquationSet, B <: KernelAbstractions.Backend}
     N == state_length(configuration.equations) || throw(DimensionMismatch("$(nameof(E)) needs u0 of length $(state_length(configuration.equations)), got $N"))
+    numtype(configuration.spacetime) === T || throw(ArgumentError("spacetime uses $(numtype(configuration.spacetime)) but u0 uses $T; use the same precision (e.g. KerrSchildCoordinates(M = 1f0, a = 0.5f0) for Float32)"))
     size(initial_data, 1) == N || throw(DimensionMismatch("Each column of initial_data must be an initial condition. Expected size $N, got $(size(initial_data, 1))"))
     eltype(initial_data) === T || throw(ArgumentError("initial_data must have element type $T"))
     return _Ensemble_Problem(configuration, configuration.equations, initial_data)

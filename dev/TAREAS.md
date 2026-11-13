@@ -14,13 +14,76 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho
 
 ## Revisión 2026-11-12 (orden sugerido)
 
-### Bloque 1 — Bugs
-- [x] #1 Constructor posicional `KerrSchildCoordinates(1.0, 0.5)` siempre falla — hecho 2026-11-12 (opción B, sin `@with_kw`; se conservó el campo `topology` hasta #3)
-- [x] #2 `Configuration` no se podía construir (no había `AbstractPhysicalModel` concreto) — hecho 2026-11-13 con **opción A**: se eliminó `model` de `Configuration` e `IntegrationParameters` y se borró `AbstractPhysicalModel`. La física la define el tipo de ecuación (`GeodesicEquationsVacuum`, ...). Si una ecuación futura necesita parámetros (p. ej. plasma `ωp`), van dentro de su struct y la ecuación se agrega como campo de `IntegrationParameters`.
-- [x] #3 `AbstractCoordinate <: AbstractRayTracing` (antes colgaba de `AbstractSpacetime`) — hecho 2026-11-13. **Se conserva el campo `topology`** (decisión 2026-11-13): se usará cuando Kerr tenga otros sistemas de coordenadas (p. ej. Boyer-Lindquist) y es clave para los Callbacks (`radius(st.topology, st, x)`). Se descartó pasarlo a trait.
-  - ~~Idea: extraer r de Kerr de `_H_l` para el callback~~ → descartada (contradice el principio genérico; ver "Funciones físicas genéricas — a pedido").
-- [x] #4 Ligar `N` a la ecuación (`SVector{8}` / `SVector{16}` + `state_length`) — hecho 2026-11-13
-- [ ] #5 Evitar mezcla de precisión (`numtype` + chequeo)
+### Bloque 1 — Bugs ✅ COMPLETO (2026-11-12 / 2026-11-13)
+
+**#1 — `KerrSchildCoordinates(1.0, 0.5)` siempre daba error** (commit `fcd4edc`)
+
+Causa: antes había solo dos formas de crear el objeto.
+
+| Llamada | Qué hacía |
+|---|---|
+| `KerrSchildCoordinates(M=1.0, a=0.5)` (con nombres) | ✅ creaba el objeto |
+| `KerrSchildCoordinates(M, a)` (sin nombres, con cualquier número) | ❌ mostraba un error |
+
+La segunda estaba pensada para rechazar valores de tipo inválido (por ejemplo `Int`), pero como era la
+única forma sin nombres, también rechazaba `KerrSchildCoordinates(1.0, 0.5)`, que es válida.
+
+| Llamada | Antes | Ahora |
+|---|---|---|
+| `KerrSchildCoordinates(M=1.0, a=0.5)` | ✅ | ✅ |
+| `KerrSchildCoordinates(1.0, 0.5)` | ❌ error (bug) | ✅ |
+| `KerrSchildCoordinates(1, 0.5)` | ❌ error | ❌ error (correcto) |
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/Kerr/KerrSchildCoordinates.jl` | Sin `@with_kw`: constructor interno `{T}(M, a)` con validación por `throw`; métodos posicional `(M::T, a::T)`, keywords `(; M, a)` y fallback `(::Real, ::Real)` con error claro. Se conserva `topology`. |
+
+Uso: `KerrSchildCoordinates(M=1.0, a=0.5)` y `KerrSchildCoordinates(1.0, 0.5)`.
+
+**#2 — `Configuration` no se podía construir** (commit `cf75af8`)
+
+| Archivo | Cambio |
+|---|---|
+| `src/RayTracing_types.jl` | Se eliminó `AbstractPhysicalModel`. |
+| `src/configuration/config_types.jl` | Se eliminó el campo `model` de `Configuration` e `IntegrationParameters`. |
+| `src/propagate/ensemble.jl` | `p = IntegrationParameters(spacetime)`; firmas sin el parámetro `M`. |
+
+Decisión: la física la define el tipo de ecuación (`GeodesicEquationsVacuum`). Si una ecuación futura tiene parámetros (p. ej. plasma `ωp`), van dentro de su struct.
+
+**#3 — Un sistema de coordenadas era un subtipo de espacio-tiempo** (commit `cf75af8`)
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/spacetime_types.jl` | `AbstractCoordinate <: AbstractRayTracing` (antes `<: AbstractSpacetime`). |
+
+Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de Kerr y callbacks).
+
+**#4 — El largo de `u0` no estaba ligado a la ecuación** (commit `edd944e`)
+
+| Archivo | Cambio |
+|---|---|
+| `src/propagate/equations.jl` | Firmas `SVector{8,T}` (geodésica) y `SVector{16,T}` (transporte paralelo). |
+| `src/propagate/ensemble.jl` | `state_length(eq)` (8 / 16) + chequeo en `Ensemble_Problem`. |
+
+**#5 — Mezcla silenciosa de Float32 / Float64** (commit de este cambio)
+
+| Archivo | Cambio |
+|---|---|
+| `src/spacetime/spacetime.jl` | Declaración `function numtype end`. |
+| `src/spacetime/Kerr/Kerr.jl` | `numtype` agregado al `import`. |
+| `src/spacetime/Kerr/KerrSchildCoordinates.jl` | `numtype(::KerrSchildCoordinates{T}) where {T} = T`. |
+| `src/propagate/ensemble.jl` | Chequeo `numtype(spacetime) === T` en `Ensemble_Problem`. |
+
+**Verificación final del bloque** (test existente 3/3 + chequeo manual no agregado al repo)
+
+| Caso | Resultado |
+|---|---|
+| `KerrSchildCoordinates(1.0, 0.5)` / `(1, 0.5)` | ✅ `KerrSchildCoordinates{Float64}` / `ArgumentError` claro |
+| `Configuration` + `Ensemble_Problem` (Float64 y Float32) | ✅ `EnsembleProblem` |
+| Coordenada como `spacetime` | ❌ `MethodError` al construir `Configuration` |
+| Transporte paralelo con `u0` de 8 | ❌ `DimensionMismatch` claro |
+| Espacio-tiempo Float64 + `u0` Float32 (y viceversa) | ❌ `ArgumentError` claro |
+| Lado derecho Float32 | ✅ resultado Float32, 0 alocaciones (148 ns) |
 
 ### Bloque 2 — Dependencias
 - [ ] #12 Reemplazar `DifferentialEquations` por `SciMLBase` (compat `3.50`)
@@ -47,6 +110,8 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho
 ## Tareas agregadas por el usuario
 
 <!-- Formato: - [ ] (YYYY-MM-DD, para: YYYY-MM-DD o "sin fecha") descripción -->
+
+- [ ] (2026-11-13, para: sin fecha) **Continuar con las correcciones del Bloque 2 — Dependencias** (#12 `DifferentialEquations` → `SciMLBase`, #13 `BenchmarkTools` solo en tests, #14 quitar `Parameters` / `import KernelAbstractions as KA`). Es lo próximo después del Bloque 1 (completo).
 
 ### Bloque 6 — Tests de validación (AD de Christoffel + métricas bien escritas)
 Objetivo del usuario: el test de ∇g = 0 se hizo para verificar que la diferenciación automática de
@@ -89,3 +154,6 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #3 aplicado en `src/spacetime/spacetime_types.jl`. Test 3/3 OK; chequeo manual (no agregado al repo): `CartesianCoordinate() isa AbstractSpacetime == false`, `KerrSchildCoordinates` sigue isbits con `topology`, `Configuration`/`Ensemble_Problem` OK, y `Configuration(spacetime = CartesianCoordinate(), ...)` ahora da `MethodError`. Commit de #2 + #3 + documentación.
 - 2026-11-13: Commit `cf75af8` (#2, #3, docs) — sin push.
 - 2026-11-13: #4 aplicado. `equations.jl`: firmas `SVector{8,T}` / `SVector{16,T}`. `ensemble.jl`: `state_length` por ecuación + chequeo en `Ensemble_Problem`. Test 3/3 OK. Chequeo manual (no agregado al repo): combinaciones correctas → `EnsembleProblem`; Parallel+8 y Geodesic+16 → `DimensionMismatch` claro; llamada directa con largo incorrecto → `MethodError`. RHS sin alocaciones (`@btime`: geodésica 139 ns, transporte paralelo 234 ns, 0 bytes). Nota: medir `@allocated` en scope global da falsos positivos (80/144 B); medir dentro de función o con `@btime $x`.
+- 2026-11-13: Push de `cf75af8` y `edd944e` (WSL).
+- 2026-11-13: #5 aplicado (`numtype` + chequeo en `Ensemble_Problem`). Verificación completa de #1–#5 OK (ver tabla en Bloque 1). Bloque 1 reemplazado por resumen en tablas (aquí y en README). Bloque 1 completo.
+- 2026-11-13: README: convenciones en LaTeX (métrica de Kerr-Schild completa), causa del #1 explicada con tablas, guía "Agregar un nuevo espacio-tiempo" incluye `numtype`. CI de `edd944e` ✅.

@@ -8,6 +8,7 @@ include("christoffel.jl")
 =#
 function metric end
 function metric_inverse end
+function numtype end        # numtype(spacetime) -> Float32 or Float64 (precision of the spacetime parameters)
 
 include("Kerr/Kerr.jl")
 
