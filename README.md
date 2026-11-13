@@ -218,8 +218,6 @@ AbstractChristoffel
 
 ```julia
 # desde la carpeta del proyecto
-julia --project=. test/runtests.jl
-# o bien
 julia --project=. -e "using Pkg; Pkg.test()"
 ```
 
