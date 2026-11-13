@@ -129,9 +129,9 @@ RayTracingGR.jl/
 │   │
 │   ├── propagate/
 │   │   ├── propagate.jl              # punto de entrada (includes)
-│   │   ├── propagate_types.jl        # (vacío)
+│   │   ├── propagate_types.jl        # subtipos abstractos de propagación (hoy vacío)
 │   │   ├── equations.jl              # RHS: geodésica y transporte paralelo
-│   │   ├── ensemble.jl               # tipos de ecuaciones + Ensemble_Problem
+│   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
 │   │   └── Callback/
 │   │       └── callback.jl           # (comentado, a rehacer)
 │   │

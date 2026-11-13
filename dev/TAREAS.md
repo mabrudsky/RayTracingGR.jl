@@ -155,8 +155,16 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 <details>
 <summary><b>Bloque 3: Estructura</b></summary>
 
-- [ ] #9 Unificar los dos `_Ensemble_Problem` con una función `rhs(...)`; mover los tipos de
-  ecuaciones a `propagate_types.jl`.
+- [x] #9 Unificar los dos `_Ensemble_Problem` con una función `rhs(...)` (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/propagate/ensemble.jl` | `rhs(::GeodesicEquationsVacuum)` / `rhs(::ParallelTransportEquationsVacuum)`; un solo `Ensemble_Problem` con `ODEProblem{false}(rhs(equations), ...)`. Se borraron los dos `_Ensemble_Problem`. |
+
+  Decisión del usuario: los tipos concretos de ecuaciones se quedan en `ensemble.jl`; `propagate_types.jl`
+  es solo para subtipos abstractos de propagación (hoy vacío: `AbstractEquationSet` tiene que seguir en
+  `RayTracing_types.jl` porque `Configuration` lo usa y se carga antes). Ecuación nueva = `struct` +
+  `state_length` + `rhs` en `ensemble.jl`.
 - [ ] #10 Renombrar el submódulo `kerr` → `Kerr`, exportar `KerrSchildCoordinates` y limpiar
   imports y exports redundantes.
 - [ ] #11 Fallbacks genéricos de `christoffel` y `metric_inverse`; eliminar `AbstractChristoffel`.
@@ -251,3 +259,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: README sección Tests: se quitó `julia --project=. test/runtests.jl` (no funciona tras #13); queda solo `Pkg.test()`.
 - 2026-11-13: Reorganización de la documentación: README para usuarios (instalación, uso, convenciones, principios, estructura del proyecto con sus diagramas, citar, licencia); `CONTRIBUTING.md` nuevo con agregar espacio-tiempo y tests; los Bloques (desplegables) y las propuestas pasaron de README a este archivo, que ahora es el único lugar de pendientes (ya no hay que sincronizar con el README). `dev/` se queda en el repositorio público.
 - 2026-11-13: Sección "Cómo citar" oculta en el README (comentario HTML). Email corregido a `@gmail.com` en `CITATION.bib`, `LICENSE`, `Project.toml` y `docs/make.jl`; versión de `CITATION.bib` → `v0.1.0`. Commit + push.
+- 2026-11-13: #9 aplicado (`rhs` + un solo `Ensemble_Problem`; tipos concretos quedan en `ensemble.jl`). `Pkg.test()` 3/3 OK. Chequeo manual: `@inferred Ensemble_Problem` OK para las dos ecuaciones, `prob.f.f` es la función correcta, `prob_func` arma `SVector{N}`; largo incorrecto → `DimensionMismatch`.
