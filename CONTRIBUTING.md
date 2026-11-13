@@ -11,14 +11,17 @@ Las tareas pendientes, el historial de cambios y la revisión de código están 
 
 # Agregar un nuevo espacio-tiempo (patrón actual)
 
-1. Crear `src/spacetime/<Familia>/<Familia>.jl` con un `module`, que importe desde
-   `..RayTracingGR` los tipos abstractos y las funciones `metric`, `metric_inverse` y `christoffel`.
+1. Crear `src/spacetime/<Familia>/<Familia>.jl` con un `module <Familia>` (nombre en CamelCase, como
+   `Kerr`), que importe desde `..RayTracingGR` solo los tipos y funciones que use, y con `import` las
+   funciones `metric`, `metric_inverse`, `christoffel` y `numtype` (para agregarles un método).
 2. En un archivo aparte, definir el struct (isbits, parametrizado en `T<:Union{Float32,Float64}`) y
    los métodos `metric(st, x::SVector{4,T})`, `metric_inverse(...)`, `christoffel(...)` y
    `numtype(::MiEspacioTiempo{T}) where {T} = T`. `metric` tiene que aceptar un `T` genérico, porque
    recibe números `Dual`. `Ensemble_Problem` usa `numtype` para comprobar que la precisión coincida
    con la de `u0`.
-3. Incluirlo en `src/spacetime/spacetime.jl` y exportarlo desde `src/RayTracingGR.jl`.
+3. Incluirlo en `src/spacetime/spacetime.jl` y exportar el **submódulo** desde `src/RayTracingGR.jl`
+   (`export <Familia>`). El submódulo no exporta nada: los tipos se usan siempre con el nombre de la
+   familia adelante, por ejemplo `Kerr.KerrSchildCoordinates(M = 1.0, a = 0.9)`.
 
 ---
 

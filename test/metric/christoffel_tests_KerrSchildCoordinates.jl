@@ -30,7 +30,7 @@ end
 
 @testset "Christoffel symbols - KerrSchildCoordinates" begin
     # Test case: Verify that the covariant derivative of the metric is zero for KerrSchildCoordinates
-    spacetime = kerr.KerrSchildCoordinates(M=1.0, a=0.5)
+    spacetime = Kerr.KerrSchildCoordinates(M=1.0, a=0.5)
     u0 = @SArray [0.1, 3.0, 0.05, 1.0]
     u1 = 0.75 .* u0
     u2 = 34.79 .* u0

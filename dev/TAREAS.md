@@ -165,8 +165,18 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
   es solo para subtipos abstractos de propagación (hoy vacío: `AbstractEquationSet` tiene que seguir en
   `RayTracing_types.jl` porque `Configuration` lo usa y se carga antes). Ecuación nueva = `struct` +
   `state_length` + `rhs` en `ensemble.jl`.
-- [ ] #10 Renombrar el submódulo `kerr` → `Kerr`, exportar `KerrSchildCoordinates` y limpiar
-  imports y exports redundantes.
+- [x] #10 Renombrar el submódulo `kerr` → `Kerr` y limpiar imports y exports redundantes (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/spacetime/Kerr/Kerr.jl` | `module kerr` → `module Kerr`; se quitaron 6 imports sin uso (`AbstractSpacetime`, `AbstractCoordinate`, `SphericalCoordinate`, `AbstractChristoffel`, `ChristoffelTag`, `_Γcomp`) y `export metric, metric_inverse, christoffel`. |
+  | `src/spacetime/spacetime.jl` | Se borró `using .kerr`. |
+  | `src/RayTracingGR.jl` | `export kerr` → `export Kerr`. |
+  | `test/…/christoffel_tests_KerrSchildCoordinates.jl`, `README.md`, `CONTRIBUTING.md` | `kerr.` → `Kerr.`; paso 3 de "Agregar un nuevo espacio-tiempo" corregido. |
+
+  Decisión del usuario: `KerrSchildCoordinates` **no** se exporta (a propósito). Se usa siempre con el
+  nombre de la familia adelante: `Kerr.KerrSchildCoordinates(M = 1.0, a = 0.9)`. Los submódulos de
+  espacio-tiempo van en CamelCase y no exportan nada.
 - [ ] #11 Fallbacks genéricos de `christoffel` y `metric_inverse`; eliminar `AbstractChristoffel`.
 
 </details>
@@ -260,3 +270,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: Reorganización de la documentación: README para usuarios (instalación, uso, convenciones, principios, estructura del proyecto con sus diagramas, citar, licencia); `CONTRIBUTING.md` nuevo con agregar espacio-tiempo y tests; los Bloques (desplegables) y las propuestas pasaron de README a este archivo, que ahora es el único lugar de pendientes (ya no hay que sincronizar con el README). `dev/` se queda en el repositorio público.
 - 2026-11-13: Sección "Cómo citar" oculta en el README (comentario HTML). Email corregido a `@gmail.com` en `CITATION.bib`, `LICENSE`, `Project.toml` y `docs/make.jl`; versión de `CITATION.bib` → `v0.1.0`. Commit + push.
 - 2026-11-13: #9 aplicado (`rhs` + un solo `Ensemble_Problem`; tipos concretos quedan en `ensemble.jl`). `Pkg.test()` 3/3 OK. Chequeo manual: `@inferred Ensemble_Problem` OK para las dos ecuaciones, `prob.f.f` es la función correcta, `prob_func` arma `SVector{N}`; largo incorrecto → `DimensionMismatch`.
+- 2026-11-13: #10 aplicado (`kerr` → `Kerr`, imports/exports limpios, `KerrSchildCoordinates` sin exportar a propósito). `Pkg.test()` 3/3 OK. Chequeo manual: `Kerr` exportado, `KerrSchildCoordinates` no queda suelto, `kerr` ya no existe, `metric`/`christoffel` funcionan con `Kerr.KerrSchildCoordinates`.

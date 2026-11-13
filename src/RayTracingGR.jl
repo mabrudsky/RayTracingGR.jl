@@ -10,7 +10,7 @@ module RayTracingGR
     include("propagate/propagate.jl")   
     
     # Export spacetime module
-    export kerr
+    export Kerr
     
     # Export spacetime functions
     export metric, metric_inverse, christoffel

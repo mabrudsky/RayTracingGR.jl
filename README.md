@@ -33,7 +33,7 @@ Requiere Julia 1.10 o posterior. Para correr en GPU hay que instalar además el 
 using RayTracingGR
 using StaticArrays
 
-st = kerr.KerrSchildCoordinates(M = 1.0, a = 0.5)   # también: kerr.KerrSchildCoordinates(1.0, 0.5)
+st = Kerr.KerrSchildCoordinates(M = 1.0, a = 0.5)   # también: Kerr.KerrSchildCoordinates(1.0, 0.5)
 x  = SVector(0.0, 3.0, 0.05, 1.0)                   # (t, x, y, z)
 
 g    = metric(st, x)          # g_{μν}    :: SMatrix{4,4}
@@ -124,7 +124,7 @@ RayTracingGR.jl/
 │   │   ├── spacetime_types.jl        # AbstractKerrSpacetime, tipos de coordenadas
 │   │   ├── christoffel.jl            # Γ genérico vía ForwardDiff (_christoffel_ForwardDiff)
 │   │   └── Kerr/
-│   │       ├── Kerr.jl               # submódulo `kerr`
+│   │       ├── Kerr.jl               # submódulo `Kerr`
 │   │       └── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, christoffel
 │   │
 │   ├── propagate/
@@ -150,7 +150,7 @@ RayTracingGR.jl/
 
 ## Cómo se cargan los archivos
 
-Todo pertenece al módulo `RayTracingGR`, salvo el submódulo `kerr`. Los archivos se incluyen en este
+Todo pertenece al módulo `RayTracingGR`, salvo el submódulo `Kerr`. Los archivos se incluyen en este
 orden:
 
 ```mermaid
@@ -163,7 +163,7 @@ flowchart TD
     D --> D1[spacetime_types.jl]
     D --> D2[christoffel.jl]
     D --> D3["function metric end<br/>function metric_inverse end"]
-    D --> K["Kerr/Kerr.jl<br/>(module kerr)"]
+    D --> K["Kerr/Kerr.jl<br/>(module Kerr)"]
     K --> K1[KerrSchildCoordinates.jl]
     A --> E[propagate/propagate.jl]
     E --> E1[propagate_types.jl]
@@ -173,7 +173,7 @@ flowchart TD
 ```
 
 `metric`, `metric_inverse` y `christoffel` se declaran **una sola vez** en el módulo principal. Cada
-submódulo de espacio-tiempo, como `kerr`, las importa y les **agrega un método** para su propio tipo.
+submódulo de espacio-tiempo, como `Kerr`, las importa y les **agrega un método** para su propio tipo.
 Así, todos los espacio-tiempos comparten las mismas funciones genéricas y el despacho múltiple elige
 la implementación correcta.
 
