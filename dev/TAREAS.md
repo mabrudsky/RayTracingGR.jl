@@ -226,9 +226,62 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 <details>
 <summary><b>Bloque 5: Tests y orden</b></summary>
 
-- [ ] #15 Mover los benchmarks a `benchmark/`; tests de isbits, `@allocated == 0` y Float32.
+- [x] #15 Benchmarks a `benchmark/`; tests de isbits, cero alocaciones y Float32 (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `test/metric/christoffel_tests_KerrSchildCoordinates.jl` | Sin `@btime` (se mantienen los `println` de \|∇g\|); nuevo testset Float32 (atol `1e-5`, máx. medido ~1e-7). |
+  | `test/metric/kerr_schild_tests.jl` (nuevo) | Constructores y errores (`Int`, precisión mixta, `M < 0`, `\|a\| > M`); isbits y 0 alocaciones de `metric`, `metric_inverse`, `christoffel` (Float64/Float32). |
+  | `test/propagate/ensemble_tests.jl` (nuevo) | Casos válidos e inválidos de `Ensemble_Problem` (los 5 chequeos + coordenada como spacetime); isbits de `IntegrationParameters`; 0 alocaciones en las dos ecuaciones. GPU simulado con un arreglo cuyo `get_backend` no es CPU. |
+  | `test/runtests.jl` | Incluye los tres archivos. |
+  | `benchmark/benchmarks.jl`, `benchmark/Project.toml` (nuevos) | Los `@btime` de antes, con su entorno (`[sources]` apunta a `..`). |
+  | `Project.toml` | `BenchmarkTools` fuera de `[extras]`, `[targets]` y `[compat]`. |
+  | `.gitignore` | `/benchmark/Manifest*.toml`. |
+  | `README.md`, `CONTRIBUTING.md` | Árbol de carpetas; tabla de tests y sección "Benchmarks". |
+
+  Tests: 3 → 54.
 - [ ] #16 Callback de terminación (horizonte / radio máximo); mover `src/Document` a `docs/`; sacar
   `utils_config_path.jl`; renombrar `k` → `st` en `_christoffel_ForwardDiff`.
+
+</details>
+
+<details>
+<summary><b>Bloque 6: Tests de validación (diferenciación automática de Christoffel y métricas)</b></summary>
+
+Objetivo: el test de $\nabla g = 0$ se hizo para verificar que la diferenciación automática de
+Christoffel funcione y que las métricas estén bien escritas. Pero $\nabla g = 0$ es una identidad
+algebraica: solo prueba $g\,g^{-1} = I$ y las convenciones de índices. Estos tests cubren lo que falta.
+Detalle en `REVISION_2026-11-12.md` §17–21. Agregados el 2026-11-12, sin fecha límite.
+
+- [ ] #17 **Diferenciación automática vs diferencias finitas** (objetivo: AD). Comparar `christoffel`
+  con el $\Gamma$ armado a partir de derivadas por diferencias finitas centradas,
+  $\partial_\sigma g_{\mu\nu} \approx \dfrac{g_{\mu\nu}(x + h\,e_\sigma) - g_{\mu\nu}(x - h\,e_\sigma)}{2h}$,
+  con $h \sim 10^{-6}$ (por la escala) y tolerancia relativa $\sim 10^{-7}$ en Float64. Es la prueba
+  independiente de ForwardDiff.
+- [ ] #18 **Vector nulo de Kerr-Schild** (objetivo: métrica). Comprobar
+  $\eta^{\mu\nu} l_\mu l_\nu = 0$, $g^{\mu\nu} l_\mu l_\nu = 0$ y $g_{\mu\nu} l^\mu l^\nu = 0$, con
+  $l^\mu = \eta^{\mu\nu} l_\nu$. Valida `_H_l`.
+- [ ] #19 **Límite $a = 0$** (objetivo: métrica). Comparar `metric` con Schwarzschild en Kerr-Schild
+  escrito a mano: $2H = \dfrac{2M}{r}$, $l_\mu = \left(1, \dfrac{x}{r}, \dfrac{y}{r}, \dfrac{z}{r}\right)$.
+- [ ] #20 **Ricci $= 0$ (vacío)** (objetivo: métrica + AD). Comprobar
+
+  $$
+  R_{\mu\nu} = \partial_\lambda \Gamma^\lambda{}_{\mu\nu} - \partial_\nu \Gamma^\lambda{}_{\mu\lambda}
+  + \Gamma^\lambda{}_{\lambda\sigma} \Gamma^\sigma{}_{\mu\nu} - \Gamma^\lambda{}_{\nu\sigma} \Gamma^\sigma{}_{\mu\lambda} \approx 0
+  $$
+
+  derivando `christoffel` con Duales anidados (prueba también la AD de segundo orden) o con
+  diferencias finitas. Es la prueba más fuerte de que la métrica es solución de las ecuaciones de Einstein.
+- [ ] #21 **Constantes de movimiento** a lo largo de una geodésica integrada (cadena completa:
+  métrica → $\Gamma$ → ecuaciones → solver). Comprobar $g_{\mu\nu} k^\mu k^\nu = 0$, $E = -k_t$,
+  $L_z = x\,k_y - y\,k_x$ (índices bajos) y la constante de Carter. Depende de tener la propagación
+  (`Ensemble_Problem` + `solve`) funcionando.
+
+**Notas**
+- Para todos: evaluar varios puntos, incluyendo dentro del horizonte ($r < r_+$), cerca del eje y en
+  Float32 (con tolerancias más laxas).
+- #21: la constante de Carter **no** es genérica (sale del tensor de Killing de Kerr), así que va como
+  método específico de `AbstractKerrSpacetime`.
 
 </details>
 
@@ -237,22 +290,6 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 ## Tareas agregadas por el usuario
 
 <!-- Formato: - [ ] (YYYY-MM-DD, para: YYYY-MM-DD o "sin fecha") descripción -->
-
-- [x] (2026-11-13, para: sin fecha) **Continuar con las correcciones del Bloque 2 — Dependencias** (#12 `DifferentialEquations` → `SciMLBase`, #13 `BenchmarkTools` solo en tests, #14 quitar `Parameters` / `import KernelAbstractions as KA`). Es lo próximo después del Bloque 1 (completo).
-
-### Bloque 6 — Tests de validación (AD de Christoffel + métricas bien escritas)
-Objetivo del usuario: el test de ∇g = 0 se hizo para verificar que la diferenciación automática de
-Christoffel funcione y que las métricas estén bien escritas. Pero ∇g = 0 es una identidad algebraica:
-solo prueba g·g⁻¹ = I y las convenciones de índices. Estos tests cubren lo que falta.
-Detalle en REVISION_2026-11-12.md §17–21.
-
-- [ ] (2026-11-12, para: sin fecha) #17 **AD vs diferencias finitas**: comparar `christoffel` con Γ armado a partir de ∂g por diferencias finitas centradas (paso h ~ 1e-6·escala, rtol ~ 1e-7, Float64). Es la prueba independiente de ForwardDiff. Objetivo: AD.
-- [ ] (2026-11-12, para: sin fecha) #18 **Vector nulo de Kerr-Schild**: η^{μν} l_μ l_ν = 0, g^{μν} l_μ l_ν = 0 y g_{μν} lᵘ lᵛ = 0 (con lᵘ = η^{μν} l_ν). Valida `_H_l`. Objetivo: métrica.
-- [ ] (2026-11-12, para: sin fecha) #19 **Límite a = 0**: comparar `metric` con Schwarzschild en Kerr-Schild escrito a mano (2H = 2M/r, l = (1, x/r, y/r, z/r)). Objetivo: métrica.
-- [ ] (2026-11-12, para: sin fecha) #20 **Ricci = 0 (vacío)**: R_{μν} = ∂_λΓ^λ_{μν} − ∂_νΓ^λ_{μλ} + Γ^λ_{λσ}Γ^σ_{μν} − Γ^λ_{νσ}Γ^σ_{μλ} ≈ 0, derivando `christoffel` con Dual anidado (prueba también AD de segundo orden) o con diferencias finitas. Es la prueba más fuerte de que la métrica es solución de Einstein. Objetivo: métrica + AD.
-- [ ] (2026-11-12, para: sin fecha) #21 **Constantes de movimiento** a lo largo de una geodésica integrada: g_{μν}kᵘkᵛ = 0, E = −k_t, L_z = x k_y − y k_x (índices bajos) y constante de Carter. Valida toda la cadena: métrica → Γ → ecuaciones → solver. Depende de tener la propagación (`Ensemble_Problem` + `solve`) funcionando.
-- Nota para todos: evaluar varios puntos, incluyendo dentro del horizonte (r < r₊), cerca del eje y en Float32 (tolerancias más laxas).
-- Nota #21: la constante de Carter NO es genérica (tensor de Killing de Kerr) → método específico de `AbstractKerrSpacetime`.
 
 ### Funciones físicas genéricas — A PEDIDO (2026-11-13)
 **Principio:** cada magnitud (frecuencias, energía, lapse/shift, tétradas, curvatura, callbacks...) se
@@ -308,3 +345,5 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #6 descartado por legibilidad (medición registrada en el Bloque 4).
 - 2026-11-13: #7 aplicado (`Val(4)` + comentario en `_christoffel_ForwardDiff`). `Pkg.test()` 3/3 OK; tipo inferido correcto y 0 alocaciones en Float64/Float32.
 - 2026-11-13: #8 parte 2 aplicada (chequeo `KA.get_backend(initial_data) isa KA.CPU`). `Pkg.test()` 3/3 OK. Chequeo manual: `Matrix`, `view` y `transpose` aceptados; arreglo con backend GPU (simulado) → `ArgumentError`. Parte 1 movida a la tarea del backend/`solve`. Bloque 4 completo.
+- 2026-11-13: Bloque 6 pasado a desplegable junto a los Bloques 1–5, con notación LaTeX; se quitó la tarea ya cumplida "Continuar con el Bloque 2".
+- 2026-11-13: #15 aplicado. `Pkg.test()` 54/54 OK (antes 3). Benchmark: `julia --project=benchmark benchmark/benchmarks.jl` da los mismos tiempos (christoffel ~66 ns, 0 alocaciones).

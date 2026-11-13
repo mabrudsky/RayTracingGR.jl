@@ -139,8 +139,15 @@ RayTracingGR.jl/
 │
 ├── test/
 │   ├── runtests.jl
-│   └── metric/
-│       └── christoffel_tests_KerrSchildCoordinates.jl  # ∇g = 0 + benchmarks
+│   ├── metric/
+│   │   ├── christoffel_tests_KerrSchildCoordinates.jl  # ∇g = 0 (Float64 y Float32)
+│   │   └── kerr_schild_tests.jl      # constructores, isbits, cero alocaciones
+│   └── propagate/
+│       └── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
+│
+├── benchmark/
+│   ├── Project.toml                  # entorno propio (BenchmarkTools)
+│   └── benchmarks.jl                 # tiempos con @btime (se corre a mano)
 │
 ├── docs/                             # Documenter.jl
 └── dev/

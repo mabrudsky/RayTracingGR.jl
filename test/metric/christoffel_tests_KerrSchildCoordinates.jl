@@ -1,5 +1,4 @@
 using RayTracingGR
-using BenchmarkTools
 import Test: @testset, @test
 import ForwardDiff: Dual, Partials, partials
 import StaticArrays: SVector, @SVector, @SArray, @MArray
@@ -35,9 +34,9 @@ end
     u1 = 0.75 .* u0
     u2 = 34.79 .* u0
 
-    print("∇g0: "); ∇g0 = @btime covariant_derivative_metric($spacetime, $u0)
-    print("∇g1: "); ∇g1 = @btime covariant_derivative_metric($spacetime, $u1)
-    print("∇g2: "); ∇g2 = @btime covariant_derivative_metric($spacetime, $u2)
+    ∇g0 = covariant_derivative_metric(spacetime, u0)
+    ∇g1 = covariant_derivative_metric(spacetime, u1)
+    ∇g2 = covariant_derivative_metric(spacetime, u2)
     println("===================================================")
     # Verify that the maximum value of |∇g| is zero within floating-point tolerance
     @test maximum(abs.(∇g0)) ≈ 0 atol=1e-12  # Equivalent to @test isapprox(maximum(abs.(∇g0)), 0; atol=1e-12)
@@ -46,13 +45,25 @@ end
     println("Maximum value of |∇g1|: ", maximum(abs.(∇g1)))
     @test maximum(abs.(∇g2)) ≈ 0 atol=1e-12  # Equivalent to @test isapprox(maximum(abs.(∇g2)), 0; atol=1e-12)
     println("Maximum value of |∇g2|: ", maximum(abs.(∇g2)))
-
-    println("=============== Benchmarks (@btime) ===============")
-    print(rpad("metric:", 32));                      @btime metric($spacetime, $u0)
-    print(rpad("metric_inverse:", 32));              @btime metric_inverse($spacetime, $u0)
-    print(rpad("christoffel:", 32));                 @btime christoffel($spacetime, $u0)
-    print(rpad("covariant_derivative_metric:", 32)); @btime covariant_derivative_metric($spacetime, $u0)
     println("===================================================")
 end
 
-    
+@testset "Christoffel symbols - KerrSchildCoordinates (Float32)" begin
+    # Same check in Float32: the result must stay Float32 and ∇g ≈ 0 with a looser tolerance
+    spacetime = Kerr.KerrSchildCoordinates(M=1f0, a=0.5f0)
+    u0 = SVector{4,Float32}(0.1, 3.0, 0.05, 1.0)
+    u1 = 0.75f0 .* u0
+    u2 = 34.79f0 .* u0
+
+    ∇g0 = covariant_derivative_metric(spacetime, u0)
+    ∇g1 = covariant_derivative_metric(spacetime, u1)
+    ∇g2 = covariant_derivative_metric(spacetime, u2)
+    @test eltype(christoffel(spacetime, u0)) === Float32
+    @test maximum(abs.(∇g0)) ≈ 0 atol=1e-5
+    println("Maximum value of |∇g0| (Float32): ", maximum(abs.(∇g0)))
+    @test maximum(abs.(∇g1)) ≈ 0 atol=1e-5
+    println("Maximum value of |∇g1| (Float32): ", maximum(abs.(∇g1)))
+    @test maximum(abs.(∇g2)) ≈ 0 atol=1e-5
+    println("Maximum value of |∇g2| (Float32): ", maximum(abs.(∇g2)))
+    println("===================================================")
+end

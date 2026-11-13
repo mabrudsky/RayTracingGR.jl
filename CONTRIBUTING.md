@@ -33,7 +33,25 @@ Las tareas pendientes, el historial de cambios y la revisión de código están 
 julia --project=. -e "using Pkg; Pkg.test()"
 ```
 
-El test actual verifica que la derivada covariante de la métrica se anule (∇g = 0) en tres puntos.
-Con eso comprueba que `metric_inverse` sea la inversa de `metric` y que las convenciones de índices
-de `christoffel` sean correctas. También muestra benchmarks: todas las funciones corren sin alocar
-memoria.
+| Archivo | Qué comprueba |
+|---|---|
+| `test/metric/christoffel_tests_KerrSchildCoordinates.jl` | Que la derivada covariante de la métrica se anule (∇g = 0) en tres puntos, en Float64 y Float32. Con eso comprueba que `metric_inverse` sea la inversa de `metric` y las convenciones de índices de `christoffel`. |
+| `test/metric/kerr_schild_tests.jl` | Constructores de `KerrSchildCoordinates` (y sus errores); que todo sea isbits y que `metric`, `metric_inverse` y `christoffel` no aloquen memoria, en Float64 y Float32. |
+| `test/propagate/ensemble_tests.jl` | Los chequeos de `Ensemble_Problem` (largo de `u0`, precisión, filas y tipo de `initial_data`, `initial_data` en la CPU) y que las ecuaciones no aloquen memoria. |
+
+Las alocaciones se miden dentro de una función: medidas en el ámbito global (o con un alias global
+no constante) dan resultados falsos.
+
+# Benchmarks
+
+Los tiempos (`@btime`) no son parte de los tests: están en `benchmark/benchmarks.jl`, con su propio
+entorno, y se corren a mano.
+
+```julia
+# desde la carpeta del proyecto (la primera vez: instantiate)
+julia --project=benchmark -e "using Pkg; Pkg.instantiate()"
+julia --project=benchmark benchmark/benchmarks.jl
+```
+
+En Julia 1.10, `benchmark/Project.toml` no reconoce la sección `[sources]`: la primera vez hay que
+correr `Pkg.develop(path = ".")` con `--project=benchmark` en lugar de `Pkg.instantiate()`.

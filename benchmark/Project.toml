@@ -1,0 +1,8 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+RayTracingGR = "4b51895e-7621-4f2b-bab6-efc159b47762"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[sources]
+RayTracingGR = {path = ".."}
