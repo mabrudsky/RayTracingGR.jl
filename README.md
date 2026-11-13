@@ -122,10 +122,10 @@ RayTracingGR.jl/
 │   ├── spacetime/
 │   │   ├── spacetime.jl              # punto de entrada; declara metric / metric_inverse
 │   │   ├── spacetime_types.jl        # AbstractKerrSpacetime, tipos de coordenadas
-│   │   ├── christoffel.jl            # Γ genérico vía ForwardDiff (_christoffel_ForwardDiff)
+│   │   ├── christoffel.jl            # christoffel genérico (fallback) vía ForwardDiff
 │   │   └── Kerr/
 │   │       ├── Kerr.jl               # submódulo `Kerr`
-│   │       └── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, christoffel
+│   │       └── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, numtype
 │   │
 │   ├── propagate/
 │   │   ├── propagate.jl              # punto de entrada (includes)
@@ -173,9 +173,10 @@ flowchart TD
 ```
 
 `metric`, `metric_inverse` y `christoffel` se declaran **una sola vez** en el módulo principal. Cada
-submódulo de espacio-tiempo, como `Kerr`, las importa y les **agrega un método** para su propio tipo.
-Así, todos los espacio-tiempos comparten las mismas funciones genéricas y el despacho múltiple elige
-la implementación correcta.
+submódulo de espacio-tiempo, como `Kerr`, importa `metric` y `metric_inverse` y les **agrega un método**
+para su propio tipo. `christoffel` tiene un método genérico (fallback) que sirve para cualquier
+espacio-tiempo: deriva `metric` con números duales. Así, todos los espacio-tiempos comparten las mismas
+funciones y el despacho múltiple elige la implementación correcta.
 
 ## Flujo de cálculo de un rayo
 
@@ -210,8 +211,7 @@ AbstractRayTracing
         ├── GeodesicEquationsVacuum
         └── ParallelTransportEquationsVacuum
 
-AbstractChristoffel
-└── ChristoffelTag                            (tag de ForwardDiff)
+ChristoffelTag                                (tag de ForwardDiff, fuera de la jerarquía)
 ```
 
 ---

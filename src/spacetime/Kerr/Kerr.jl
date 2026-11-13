@@ -1,8 +1,8 @@
 module Kerr
 using StaticArrays
-using ..RayTracingGR: AbstractKerrSpacetime, CartesianCoordinate, _christoffel_ForwardDiff
+using ..RayTracingGR: AbstractKerrSpacetime, CartesianCoordinate
 
-import ..RayTracingGR: metric, metric_inverse, christoffel, numtype # Bring in "metric", "metric_inverse" and "christoffel" so this module adds a new case to each instead of accidentally creating a separate, disconnected function.
+import ..RayTracingGR: metric, metric_inverse, numtype # Bring in "metric", "metric_inverse" and "numtype" so this module adds a new case to each instead of accidentally creating a separate, disconnected function.
 #------------------------------- spacetime --------------------------------- 
 include("KerrSchildCoordinates.jl")
 

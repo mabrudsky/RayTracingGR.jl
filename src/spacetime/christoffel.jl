@@ -1,5 +1,4 @@
-abstract type AbstractChristoffel end
-struct ChristoffelTag <: AbstractChristoffel end
+struct ChristoffelTag end   # tag for the ForwardDiff Duals used in christoffel
 
 """ Declare "christoffel" here first, with no implementation yet,
     so that every spacetime module (Kerr, Schwarzschild, etc.) adds
@@ -24,6 +23,10 @@ end
     ginv = metric_inverse(k, position)
     return @SArray [_Γcomp(ginv, ∂g, λ, μ, ν) for μ in 1:4, ν in 1:4, λ in 1:4]
 end
+
+# Generic fallback: Γ^λ_{μν} from metric() and metric_inverse() for any spacetime.
+# A spacetime with an analytic Γ can still add its own, more specific method.
+christoffel(spacetime::AbstractSpacetime, position::SVector{4,T}) where T = _christoffel_ForwardDiff(spacetime, position)
 
 
 #=

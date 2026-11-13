@@ -108,10 +108,3 @@ end
                                 g13, g23, g33, g43, 
                                 g14, g24, g34, g44)
 end
-
-#========================================================#
-# 3) christoffel(k, point) -> Γ^λ_{μν}                   #  
-#    Differentiates metric() at runtime via "multi-seed" #
-#    Duals (isbits -> compatible with CUDA kernels).     #  
-#========================================================#
-christoffel(spacetime::KerrSchildCoordinates, position::SVector{4,T}) where T = _christoffel_ForwardDiff(spacetime, position)

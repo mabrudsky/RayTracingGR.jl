@@ -153,7 +153,7 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 </details>
 
 <details>
-<summary><b>Bloque 3: Estructura</b></summary>
+<summary><b>Bloque 3: Estructura ✅ completo (2026-11-13)</b></summary>
 
 - [x] #9 Unificar los dos `_Ensemble_Problem` con una función `rhs(...)` (2026-11-13)
 
@@ -177,7 +177,17 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
   Decisión del usuario: `KerrSchildCoordinates` **no** se exporta (a propósito). Se usa siempre con el
   nombre de la familia adelante: `Kerr.KerrSchildCoordinates(M = 1.0, a = 0.9)`. Los submódulos de
   espacio-tiempo van en CamelCase y no exportan nada.
-- [ ] #11 Fallbacks genéricos de `christoffel` y `metric_inverse`; eliminar `AbstractChristoffel`.
+- [x] #11 Fallback genérico de `christoffel`; eliminar `AbstractChristoffel` (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/spacetime/christoffel.jl` | `christoffel(spacetime::AbstractSpacetime, position::SVector{4,T})` = `_christoffel_ForwardDiff(...)` (sirve para cualquier espacio-tiempo); `struct ChristoffelTag end` sin `AbstractChristoffel`. |
+  | `src/spacetime/Kerr/KerrSchildCoordinates.jl` | Se borró el método `christoffel` de Kerr (lo cubre el genérico). |
+  | `src/spacetime/Kerr/Kerr.jl` | Ya no importa `christoffel` ni `_christoffel_ForwardDiff`. |
+  | `README.md`, `CONTRIBUTING.md` | Jerarquía de tipos, árbol de carpetas y pasos para agregar un espacio-tiempo (ya no hace falta escribir `christoffel`). |
+
+  Decisión del usuario: el fallback `metric_inverse = inv(metric)` **queda pendiente** hasta que haya
+  métricas numéricas sin expresión analítica (ver tarea agregada abajo).
 
 </details>
 
@@ -238,6 +248,8 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 - [ ] (2026-11-13, para: sin fecha) **Sección "Cómo citar" del README**: está oculta en un comentario HTML (`<!-- ... -->`). `CITATION.bib` ya corregido (versión `v0.1.0`, email `@gmail.com`); falta decidir cuándo mostrarla (descomentar).
 
+- [ ] (2026-11-13, para: sin fecha) **Fallback genérico de `metric_inverse`** (`inv(metric(st, x))` para `AbstractSpacetime`), cuando se implementen métricas numéricas sin expresión analítica de la inversa. Postergado del #11. Ojo: si una métrica analítica se olvida su inversa, el fallback la cubre en silencio (más lento, menos preciso en Float32).
+
 ### Propuestas en evaluación (no confirmadas)
 - `Configuration`: `tspan::Tuple{T,T}` no convierte tipos; `(0.0, 100)` da un `MethodError`. Hay que
   decidir entre documentarlo o agregar una conversión.
@@ -271,3 +283,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: Sección "Cómo citar" oculta en el README (comentario HTML). Email corregido a `@gmail.com` en `CITATION.bib`, `LICENSE`, `Project.toml` y `docs/make.jl`; versión de `CITATION.bib` → `v0.1.0`. Commit + push.
 - 2026-11-13: #9 aplicado (`rhs` + un solo `Ensemble_Problem`; tipos concretos quedan en `ensemble.jl`). `Pkg.test()` 3/3 OK. Chequeo manual: `@inferred Ensemble_Problem` OK para las dos ecuaciones, `prob.f.f` es la función correcta, `prob_func` arma `SVector{N}`; largo incorrecto → `DimensionMismatch`.
 - 2026-11-13: #10 aplicado (`kerr` → `Kerr`, imports/exports limpios, `KerrSchildCoordinates` sin exportar a propósito). `Pkg.test()` 3/3 OK. Chequeo manual: `Kerr` exportado, `KerrSchildCoordinates` no queda suelto, `kerr` ya no existe, `metric`/`christoffel` funcionan con `Kerr.KerrSchildCoordinates`.
+- 2026-11-13: #11 aplicado (fallback `christoffel` para `AbstractSpacetime`, se borra el método de Kerr, `ChristoffelTag` sin abstracto). `metric_inverse` genérico postergado (tarea nueva). `Pkg.test()` 3/3 OK. Chequeo manual: Kerr usa el método genérico, Γ idéntico a `_christoffel_ForwardDiff` en Float64 y Float32, 0 alocaciones en `christoffel` y en el RHS de la geodésica. Nota de medición: `@allocated` con un alias global no constante (`R = RayTracingGR`) da 192 B falsos; usar `const`. Bloque 3 completo.
