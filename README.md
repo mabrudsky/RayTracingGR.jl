@@ -1,8 +1,8 @@
 # RayTracingGR.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://mabrudsky.github.io/RayTracing.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://mabrudsky.github.io/RayTracing.jl/dev/)
-[![Build Status](https://github.com/mabrudsky/RayTracing.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/mabrudsky/RayTracing.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://mabrudsky.github.io/RayTracingGR.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://mabrudsky.github.io/RayTracingGR.jl/dev/)
+[![Build Status](https://github.com/mabrudsky/RayTracingGR.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/mabrudsky/RayTracingGR.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
 Trazado de rayos (*ray tracing*) de fotones en Relatividad General, pensado para correr en **GPU**.
 Integra las ecuaciones de las geodésicas nulas, y opcionalmente el transporte paralelo de una base de

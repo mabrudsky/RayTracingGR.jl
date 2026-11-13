@@ -61,6 +61,6 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Documenter: DocMeta, doctest
-          using RayTracing
-          DocMeta.setdocmeta!(RayTracing, :DocTestSetup, :(using RayTracing); recursive=true)
-          doctest(RayTracing)
+          using RayTracingGR
+          DocMeta.setdocmeta!(RayTracingGR, :DocTestSetup, :(using RayTracingGR); recursive=true)
+          doctest(RayTracingGR)

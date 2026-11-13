@@ -69,3 +69,5 @@ Detalle en REVISION_2026-11-12.md §17–21.
 - 2026-11-12: README reescrito (estructura, diagramas de carpetas/includes/flujo/tipos, convenciones, sección Pendientes). Al cambiar tareas, mantener sincronizada la sección "Pendientes" del README con este archivo.
 - 2026-11-12: Agregado Bloque 6 (#17–#21, tests de validación de AD y métricas) a pedido del usuario. Solo registrado, no implementado.
 - 2026-11-12: Commit `fcd4edc` en la rama `revision-2026-11-12` (constructor #1, README, dev/). Mergeado a `main` (fast-forward).
+- 2026-11-12: Push a GitHub desde WSL (`928dc13`).
+- 2026-11-13: CI → job Documentation fallaba desde 2026-10-19 (tests OK en 1.10/1.12/pre). Causa: nombre viejo `RayTracing` tras renombrar a `RayTracingGR`. Corregido en docs/Project.toml, docs/make.jl (incl. `deploydocs` repo), docs/src/index.md, CI.yml (doctests), badges del README y CITATION.bib. Sin build local de docs (no autorizado). Pendiente tras el push: verificar CI y activar GitHub Pages (Settings → Pages → `gh-pages`). Manifests locales con `[[deps.RayTracing]]` (ignorados por git) → regenerar.

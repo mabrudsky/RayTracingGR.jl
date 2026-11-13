@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = RayTracing
+CurrentModule = RayTracingGR
 ```
 
-# RayTracing
+# RayTracingGR
 
-Documentation for [RayTracing](https://github.com/mabrudsky/RayTracing.jl).
+Documentation for [RayTracingGR](https://github.com/mabrudsky/RayTracingGR.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [RayTracing]
+Modules = [RayTracingGR]
 ```
