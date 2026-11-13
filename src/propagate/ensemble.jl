@@ -1,7 +1,12 @@
 struct GeodesicEquationsVacuum <: AbstractEquationSet end
 struct ParallelTransportEquationsVacuum <: AbstractEquationSet end
+
+# Number of components of the state vector u required by each equation set
+state_length(::GeodesicEquationsVacuum)          = 8
+state_length(::ParallelTransportEquationsVacuum) = 16
 #-------------------------------------------------------------------------
 function Ensemble_Problem(configuration::Configuration{N,T,S,E,B}, initial_data::AbstractMatrix) where {N, T <: Union{Float32,Float64}, S <: AbstractSpacetime, E <: AbstractEquationSet, B <: KernelAbstractions.Backend}
+    N == state_length(configuration.equations) || throw(DimensionMismatch("$(nameof(E)) needs u0 of length $(state_length(configuration.equations)), got $N"))
     size(initial_data, 1) == N || throw(DimensionMismatch("Each column of initial_data must be an initial condition. Expected size $N, got $(size(initial_data, 1))"))
     eltype(initial_data) === T || throw(ArgumentError("initial_data must have element type $T"))
     return _Ensemble_Problem(configuration, configuration.equations, initial_data)

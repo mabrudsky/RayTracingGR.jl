@@ -19,7 +19,7 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho
 - [x] #2 `Configuration` no se podía construir (no había `AbstractPhysicalModel` concreto) — hecho 2026-11-13 con **opción A**: se eliminó `model` de `Configuration` e `IntegrationParameters` y se borró `AbstractPhysicalModel`. La física la define el tipo de ecuación (`GeodesicEquationsVacuum`, ...). Si una ecuación futura necesita parámetros (p. ej. plasma `ωp`), van dentro de su struct y la ecuación se agrega como campo de `IntegrationParameters`.
 - [x] #3 `AbstractCoordinate <: AbstractRayTracing` (antes colgaba de `AbstractSpacetime`) — hecho 2026-11-13. **Se conserva el campo `topology`** (decisión 2026-11-13): se usará cuando Kerr tenga otros sistemas de coordenadas (p. ej. Boyer-Lindquist) y es clave para los Callbacks (`radius(st.topology, st, x)`). Se descartó pasarlo a trait.
   - ~~Idea: extraer r de Kerr de `_H_l` para el callback~~ → descartada (contradice el principio genérico; ver "Funciones físicas genéricas — a pedido").
-- [ ] #4 Ligar `N` a la ecuación (`SVector{8}` / `SVector{16}` + `state_length`)
+- [x] #4 Ligar `N` a la ecuación (`SVector{8}` / `SVector{16}` + `state_length`) — hecho 2026-11-13
 - [ ] #5 Evitar mezcla de precisión (`numtype` + chequeo)
 
 ### Bloque 2 — Dependencias
@@ -87,3 +87,5 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #3 redefinido: solo reubicar `AbstractCoordinate`; `topology` se queda (futuros sistemas de coordenadas + callbacks).
 - 2026-11-13: Discutido diseño "todo genérico desde la métrica". Decisión final: patrón `christoffel` para cada magnitud, implementado a pedido; se descartó el Bloque 7 planificado (#22–#26).
 - 2026-11-13: #3 aplicado en `src/spacetime/spacetime_types.jl`. Test 3/3 OK; chequeo manual (no agregado al repo): `CartesianCoordinate() isa AbstractSpacetime == false`, `KerrSchildCoordinates` sigue isbits con `topology`, `Configuration`/`Ensemble_Problem` OK, y `Configuration(spacetime = CartesianCoordinate(), ...)` ahora da `MethodError`. Commit de #2 + #3 + documentación.
+- 2026-11-13: Commit `cf75af8` (#2, #3, docs) — sin push.
+- 2026-11-13: #4 aplicado. `equations.jl`: firmas `SVector{8,T}` / `SVector{16,T}`. `ensemble.jl`: `state_length` por ecuación + chequeo en `Ensemble_Problem`. Test 3/3 OK. Chequeo manual (no agregado al repo): combinaciones correctas → `EnsembleProblem`; Parallel+8 y Geodesic+16 → `DimensionMismatch` claro; llamada directa con largo incorrecto → `MethodError`. RHS sin alocaciones (`@btime`: geodésica 139 ns, transporte paralelo 234 ns, 0 bytes). Nota: medir `@allocated` en scope global da falsos positivos (80/144 B); medir dentro de función o con `@btime $x`.

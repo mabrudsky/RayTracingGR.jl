@@ -214,8 +214,8 @@ El número `#N` remite a esa revisión.
 - [x] #3 `AbstractCoordinate` ahora cuelga de `AbstractRayTracing` y no de `AbstractSpacetime`. El
   campo `topology` se conserva: indica el sistema de coordenadas para futuras variantes de Kerr y para
   los callbacks.
-- [ ] #4 Ligar la dimensión `N` a la ecuación (`SVector{8}` / `SVector{16}` + `state_length`). Hoy
-  `@inbounds` puede leer fuera de rango sin avisar.
+- [x] #4 La dimensión `N` quedó ligada a la ecuación: firmas `SVector{8}` / `SVector{16}`, y
+  `state_length` con un chequeo en `Ensemble_Problem`.
 - [ ] #5 Evitar la mezcla silenciosa de precisión entre el espacio-tiempo y `u0` (`numtype` + chequeo).
 
 ### Bloque 2: Dependencias

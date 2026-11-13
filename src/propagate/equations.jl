@@ -1,4 +1,4 @@
-function geodesic_equations_Vacuum(u::SVector{N,T}, p, t) where {N,T}
+function geodesic_equations_Vacuum(u::SVector{8,T}, p, t) where {T}           # u = (x⁰..x³, k⁰..k³)
     @inbounds begin
         position = SVector{4,T}(u[1], u[2], u[3], u[4])
         k = SVector{4,T}(u[5], u[6], u[7], u[8])
@@ -11,7 +11,7 @@ function geodesic_equations_Vacuum(u::SVector{N,T}, p, t) where {N,T}
     return du
 end 
 
-function parallel_transport_equations_Vacuum(u::SVector{N,T}, p, t) where {N,T}
+function parallel_transport_equations_Vacuum(u::SVector{16,T}, p, t) where {T}  # u = (x, k, ex, ey)
     @inbounds begin
         position = SVector{4,T}(u[1], u[2], u[3], u[4])
         k  = SVector{4,T}(u[5], u[6], u[7], u[8])
