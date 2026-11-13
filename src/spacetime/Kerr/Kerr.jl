@@ -1,6 +1,5 @@
 module kerr
 using StaticArrays
-using Parameters
 using ..RayTracingGR: AbstractSpacetime, AbstractKerrSpacetime, AbstractCoordinate, CartesianCoordinate, SphericalCoordinate
 using ..RayTracingGR: AbstractChristoffel, ChristoffelTag, _Γcomp, _christoffel_ForwardDiff
 

@@ -85,11 +85,11 @@ Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de K
 | Espacio-tiempo Float64 + `u0` Float32 (y viceversa) | ❌ `ArgumentError` claro |
 | Lado derecho Float32 | ✅ resultado Float32, 0 alocaciones (148 ns) |
 
-### Bloque 2 — Dependencias
-- [ ] #12 Reemplazar `DifferentialEquations` por `SciMLBase` (compat `3.50`)
-- [ ] #13 `BenchmarkTools` solo en tests
-- [ ] #14 Quitar `Parameters`; `import KernelAbstractions as KA`
-  - Nota: tras #1, `KerrSchildCoordinates` ya no usa `@with_kw`; el `using Parameters` de `src/spacetime/Kerr/Kerr.jl` quedó sin uso. `Configuration`/`IntegrationParameters` (config_types.jl) todavía usan `@with_kw` → pasar a `Base.@kwdef`.
+### Bloque 2 — Dependencias ✅ COMPLETO (2026-11-13)
+- [x] #12 Reemplazar `DifferentialEquations` por `SciMLBase` (compat `3.50`) — `Project.toml`, `src/RayTracingGR.jl` (`import SciMLBase`), `src/propagate/ensemble.jl` (`DE.` → `SciMLBase.`)
+- [x] #13 `BenchmarkTools` solo en tests — `[extras]` + `[targets] test = ["Test", "BenchmarkTools"]`; compat se mantiene. Correr tests con `Pkg.test()`.
+- [x] #14 Quitar `Parameters`; `import KernelAbstractions as KA` — `Project.toml`, `src/RayTracingGR.jl`, `src/spacetime/Kerr/Kerr.jl` (`using Parameters` borrado), `config_types.jl` (`Base.@kwdef`, `KA.Backend`), `ensemble.jl` (`KA.Backend` en las 3 firmas)
+  - Nota (histórica): tras #1, `KerrSchildCoordinates` ya no usa `@with_kw`; el `using Parameters` de `src/spacetime/Kerr/Kerr.jl` quedó sin uso. `Configuration`/`IntegrationParameters` (config_types.jl) todavía usan `@with_kw` → pasar a `Base.@kwdef`.
 
 ### Bloque 3 — Estructura
 - [ ] #9 Unificar `_Ensemble_Problem` con `rhs(...)`; tipos a `propagate_types.jl`
@@ -111,7 +111,7 @@ Decisión: se conserva el campo `topology` (futuros sistemas de coordenadas de K
 
 <!-- Formato: - [ ] (YYYY-MM-DD, para: YYYY-MM-DD o "sin fecha") descripción -->
 
-- [ ] (2026-11-13, para: sin fecha) **Continuar con las correcciones del Bloque 2 — Dependencias** (#12 `DifferentialEquations` → `SciMLBase`, #13 `BenchmarkTools` solo en tests, #14 quitar `Parameters` / `import KernelAbstractions as KA`). Es lo próximo después del Bloque 1 (completo).
+- [x] (2026-11-13, para: sin fecha) **Continuar con las correcciones del Bloque 2 — Dependencias** (#12 `DifferentialEquations` → `SciMLBase`, #13 `BenchmarkTools` solo en tests, #14 quitar `Parameters` / `import KernelAbstractions as KA`). Es lo próximo después del Bloque 1 (completo).
 
 ### Bloque 6 — Tests de validación (AD de Christoffel + métricas bien escritas)
 Objetivo del usuario: el test de ∇g = 0 se hizo para verificar que la diferenciación automática de
@@ -138,6 +138,10 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 ---
 
+- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Idea: `solve(ep, GPUTsit5(), DiffEqGPU.EnsembleGPUKernel(configuration.backend); ...)`.
+
+---
+
 ## Historial de sesiones
 
 - 2026-11-12: Revisión completa (solo lectura). Creados `dev/REVISION_2026-11-12.md` y `dev/TAREAS.md`.
@@ -157,3 +161,6 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: Push de `cf75af8` y `edd944e` (WSL).
 - 2026-11-13: #5 aplicado (`numtype` + chequeo en `Ensemble_Problem`). Verificación completa de #1–#5 OK (ver tabla en Bloque 1). Bloque 1 reemplazado por resumen en tablas (aquí y en README). Bloque 1 completo.
 - 2026-11-13: README: convenciones en LaTeX (métrica de Kerr-Schild completa), causa del #1 explicada con tablas, guía "Agregar un nuevo espacio-tiempo" incluye `numtype`. CI de `edd944e` ✅.
+- 2026-11-13: #12 y #13 aplicados. `Pkg.resolve()` (Manifest local sin `DifferentialEquations`/`OrdinaryDiffEq`; SciMLBase 3.50.2). `Pkg.test()` 3/3 OK, 0 alocaciones. Chequeo manual: `Ensemble_Problem` → `SciMLBase.EnsembleProblem`; `DifferentialEquations` no se carga. Falta #14.
+- 2026-11-13: #14 aplicado. `Pkg.resolve()` + `Pkg.test()` 3/3 OK, 0 alocaciones. Chequeo manual: `KA.Backend === KernelAbstractions.Backend`; `Configuration` por keywords con `CPU()` OK (Float64 geodésica y Float32 transporte paralelo → `EnsembleProblem`); backend inválido → `MethodError`; campo faltante → `UndefKeywordError`; `IntegrationParameters` isbits. `Parameters` ya no se carga. Bloque 2 completo.
+- 2026-11-13: README: Bloque 2 documentado con tablas (como el Bloque 1). Nuevo estilo fijado por el usuario: `#` secciones, `##` subsecciones, bloques de Pendientes como desplegables `<details>` con título en negrita. Commit del Bloque 2 + push (WSL). Pendiente menor: la sección Tests del README todavía muestra `test/runtests.jl` (ya no funciona tras #13).
