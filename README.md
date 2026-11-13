@@ -27,6 +27,9 @@ Todo el código que corre dentro de un kernel de GPU sigue estas reglas:
   uso de registros.
 - **Derivadas automáticas compatibles con GPU**: los símbolos de Christoffel se obtienen derivando la
   métrica con números duales de ForwardDiff (`Dual`), que también son isbits.
+- **Todo genérico a partir de la métrica**: como `christoffel`, cada magnitud física se escribe como
+  una función genérica de `(spacetime, x)` que solo usa `metric`, `metric_inverse` y sus derivadas con
+  Duales. Una métrica nueva solo define su struct (con `topology`), `metric` y `metric_inverse`.
 
 ---
 
@@ -138,9 +141,9 @@ la implementación correcta.
 
 ```mermaid
 flowchart LR
-    CFG["Configuration<br/>(spacetime, equations,<br/>backend, u0, model, tspan)"] --> EP[Ensemble_Problem]
+    CFG["Configuration<br/>(spacetime, equations,<br/>backend, u0, tspan)"] --> EP[Ensemble_Problem]
     ID["initial_data<br/>(matriz N × rayos)"] --> EP
-    EP --> P["IntegrationParameters<br/>(spacetime, model)<br/>→ p, isbits"]
+    EP --> P["IntegrationParameters<br/>(spacetime)<br/>→ p, isbits"]
     EP --> RHS["geodesic_equations_Vacuum<br/>parallel_transport_equations_Vacuum"]
     P --> RHS
     RHS --> CH["christoffel(spacetime, x)"]
@@ -154,19 +157,18 @@ flowchart LR
 ```text
 AbstractRayTracing
 ├── AbstractSpacetime
-│   ├── AbstractKerrSpacetime
-│   │   └── KerrSchildCoordinates{T}          (M, a, topology)
-│   └── AbstractCoordinate                    ⚠ debería colgar de AbstractRayTracing (#3)
-│       ├── CartesianCoordinate
-│       └── SphericalCoordinate
+│   └── AbstractKerrSpacetime
+│       └── KerrSchildCoordinates{T}          (M, a, topology)
+├── AbstractCoordinate                        → valores del campo `topology`
+│   ├── CartesianCoordinate
+│   └── SphericalCoordinate
 ├── AbstractConfiguration
-│   ├── IntegrationParameters{S, M}           → viaja a la GPU como `p`
-│   └── Configuration{N, T, S, E, B, M}       → se queda en la CPU
-├── AbstractPropagate
-│   └── AbstractEquationSet
-│       ├── GeodesicEquationsVacuum
-│       └── ParallelTransportEquationsVacuum
-└── AbstractPhysicalModel                     ⚠ todavía sin subtipos concretos (#2)
+│   ├── IntegrationParameters{S}              → viaja a la GPU como `p`
+│   └── Configuration{N, T, S, E, B}          → se queda en la CPU
+└── AbstractPropagate
+    └── AbstractEquationSet                   → el tipo de ecuación define la física (vacío, ...)
+        ├── GeodesicEquationsVacuum
+        └── ParallelTransportEquationsVacuum
 
 AbstractChristoffel
 └── ChristoffelTag                            (tag de ForwardDiff)
@@ -207,10 +209,11 @@ El número `#N` remite a esa revisión.
 
 ### Bloque 1: Bugs
 - [x] #1 Constructor posicional `KerrSchildCoordinates(1.0, 0.5)`: corregido sin `@with_kw`.
-- [ ] #2 Crear un modelo físico concreto: `struct Vacuum <: AbstractPhysicalModel end`. Sin él,
-  `Configuration` no se puede construir.
-- [ ] #3 `AbstractCoordinate` tiene que colgar de `AbstractRayTracing`, no de `AbstractSpacetime`.
-  Además, conviene reemplazar el campo `topology` por un *trait* `coordinates(...)`.
+- [x] #2 `Configuration` no se podía construir: se eliminó el campo `model` redundante, porque la
+  física la define el tipo de ecuación.
+- [x] #3 `AbstractCoordinate` ahora cuelga de `AbstractRayTracing` y no de `AbstractSpacetime`. El
+  campo `topology` se conserva: indica el sistema de coordenadas para futuras variantes de Kerr y para
+  los callbacks.
 - [ ] #4 Ligar la dimensión `N` a la ecuación (`SVector{8}` / `SVector{16}` + `state_length`). Hoy
   `@inbounds` puede leer fuera de rango sin avisar.
 - [ ] #5 Evitar la mezcla silenciosa de precisión entre el espacio-tiempo y `u0` (`numtype` + chequeo).
@@ -251,7 +254,7 @@ diferenciación automática ni la física. Estos tests completan esa validación
 - [ ] #20 **Ricci = 0**: confirma que la métrica es solución de vacío. Además prueba la diferenciación
   automática de segundo orden.
 - [ ] #21 **Constantes de movimiento** a lo largo de una geodésica (condición nula, E, L_z, Carter).
-  Depende de #2 y de la propagación.
+  Depende de que la propagación funcione.
 
 ### Propuestas en evaluación (no confirmadas)
 - `Configuration`: `tspan::Tuple{T,T}` no convierte tipos; `(0.0, 100)` da un `MethodError`. Hay que
