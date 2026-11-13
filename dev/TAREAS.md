@@ -302,7 +302,24 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 ---
 
-- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Idea: `solve(ep, GPUTsit5(), DiffEqGPU.EnsembleGPUKernel(configuration.backend); trajectories = n, save_everystep = false, save_start = false, dt = ...)`. Parte 1 del #8: sin `save_everystep = false` DiffEqGPU reserva `pasos × rayos` en la GPU (`lowerlevel_solve.jl`, líneas 83-85; p. ej. 10⁶ rayos × 1000 pasos × 8 Float32 = 32 GB, contra 32 MB solo con el estado final); `output_func` filtra recién después de integrar. Falta decidir integrador (`GPUTsit5`, `GPUVern7`, ...) y `dt`.
+- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Objetivo del usuario: resolver tanto en CPU como en GPU con los métodos disponibles en cada caso.
+
+  | Backend | Integradores | Ensemble | Paquete |
+  |---|---|---|---|
+  | `CPU()` | `Tsit5`, `Vern7`, `Vern9` | `EnsembleThreads()` | `OrdinaryDiffEqTsit5`, `OrdinaryDiffEqVerner` (agregados 2026-11-13) |
+  | GPU (`CUDABackend()`, ...) | `GPUTsit5`, `GPUVern7`, `GPUVern9` | `EnsembleGPUKernel(backend)` | `DiffEqGPU` |
+
+  Idea GPU: `solve(ep, GPUTsit5(), EnsembleGPUKernel(configuration.backend); trajectories = n, save_everystep = false, save_start = false, dt = ...)`.
+  Parte 1 del #8: sin `save_everystep = false` DiffEqGPU reserva `pasos × rayos` en la GPU (`lowerlevel_solve.jl`, líneas 83-85; p. ej. 10⁶ rayos × 1000 pasos × 8 Float32 = 32 GB, contra 32 MB solo con el estado final); `output_func` filtra recién después de integrar. Falta decidir cómo se elige el método y `dt`.
+
+  Medición de referencia (2026-11-13, Intel Core Ultra 7 155H, 22 hilos, Kerr a = 0.9, `dt = 0.01` fijo, 2000 rayos × 1000 pasos), ns por paso y por rayo:
+
+  | | `Tsit5` 1 hilo | `Tsit5` + `EnsembleThreads()` | `GPUTsit5` + `EnsembleGPUKernel(CPU())` |
+  |---|---|---|---|
+  | Geodésica Float64 | 666 | 122 | 510 |
+  | Geodésica Float32 | 620 | 108 | 620 |
+  | Transporte Float64 | 1007 | 214 | 858 |
+  | Transporte Float32 | 824 | 153 | 801 |
 
 - [ ] (2026-11-13, para: sin fecha) **Sección "Cómo citar" del README**: está oculta en un comentario HTML (`<!-- ... -->`). `CITATION.bib` ya corregido (versión `v0.1.0`, email `@gmail.com`); falta decidir cuándo mostrarla (descomentar).
 
@@ -347,3 +364,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #8 parte 2 aplicada (chequeo `KA.get_backend(initial_data) isa KA.CPU`). `Pkg.test()` 3/3 OK. Chequeo manual: `Matrix`, `view` y `transpose` aceptados; arreglo con backend GPU (simulado) → `ArgumentError`. Parte 1 movida a la tarea del backend/`solve`. Bloque 4 completo.
 - 2026-11-13: Bloque 6 pasado a desplegable junto a los Bloques 1–5, con notación LaTeX; se quitó la tarea ya cumplida "Continuar con el Bloque 2".
 - 2026-11-13: #15 aplicado. `Pkg.test()` 54/54 OK (antes 3). Benchmark: `julia --project=benchmark benchmark/benchmarks.jl` da los mismos tiempos (christoffel ~66 ns, 0 alocaciones).
+- 2026-11-13: Dependencias `OrdinaryDiffEqTsit5` (compat `2.1`, instalada 2.1.5) y `OrdinaryDiffEqVerner` (compat `2.4`, instalada 2.4.2) agregadas (opción A: mismos métodos en CPU y GPU). Todavía sin código que las use (tarea del `solve`). Medido el costo por paso (tabla en esa tarea). `Pkg.test()` 54/54 OK.
