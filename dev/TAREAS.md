@@ -194,9 +194,21 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 <details>
 <summary><b>Bloque 4: GPU</b></summary>
 
-- [ ] #6 Contraer Γ^λ_{μν}u^μv^ν directamente, sin construir el Γ completo (menos registros y
-  operaciones).
-- [ ] #7 `ntuple(f, 4)` → `ntuple(f, Val(4))`.
+- [-] #6 ~~Contracción directa de Γ sin armar el SArray completo~~ — **DESCARTADO por legibilidad** (2026-11-13)
+
+  Se probó (prototipo fuera del repo) calcular Γ^λ_{μν}k^μk^ν dentro de la ecuación sin armar Γ:
+  mismo resultado (dif. 3e-17 en Float64), 0 alocaciones y más rápido en CPU (geodésica 88.5 → 63.2 ns
+  en Float64, 96.3 → 53.0 ns en Float32; transporte 143 → 130 ns). Decisión del usuario: la versión
+  actual (`christoffel` + producto punto a punto) es mucho más legible para quien no conoce Julia, y se
+  mantiene. `christoffel.jl` es solo para Christoffel. Retomar solo si la velocidad en GPU lo exige.
+- [x] #7 `ntuple(f, 4)` → `ntuple(f, Val(4))` (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/spacetime/christoffel.jl` | En `_christoffel_ForwardDiff` (versión activa), los dos `ntuple` usan `Val(4)`, con el comentario `# Val(4): fixed size known at compile time (unrolled loops, required for GPU kernels)`. El bloque comentado de abajo no se tocó. |
+
+  Sin cambio medible en CPU (`christoffel` 65 ns, 0 alocaciones, tipo inferido `SArray{Tuple{4,4,4},T}` en
+  Float64 y Float32): la ganancia es la garantía de tamaño fijo al compilar en kernels de GPU.
 - [ ] #8 Resolver con `save_everystep=false, save_start=false`; `initial_data` tiene que ser una
   `Matrix` de CPU.
 
@@ -284,3 +296,5 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #9 aplicado (`rhs` + un solo `Ensemble_Problem`; tipos concretos quedan en `ensemble.jl`). `Pkg.test()` 3/3 OK. Chequeo manual: `@inferred Ensemble_Problem` OK para las dos ecuaciones, `prob.f.f` es la función correcta, `prob_func` arma `SVector{N}`; largo incorrecto → `DimensionMismatch`.
 - 2026-11-13: #10 aplicado (`kerr` → `Kerr`, imports/exports limpios, `KerrSchildCoordinates` sin exportar a propósito). `Pkg.test()` 3/3 OK. Chequeo manual: `Kerr` exportado, `KerrSchildCoordinates` no queda suelto, `kerr` ya no existe, `metric`/`christoffel` funcionan con `Kerr.KerrSchildCoordinates`.
 - 2026-11-13: #11 aplicado (fallback `christoffel` para `AbstractSpacetime`, se borra el método de Kerr, `ChristoffelTag` sin abstracto). `metric_inverse` genérico postergado (tarea nueva). `Pkg.test()` 3/3 OK. Chequeo manual: Kerr usa el método genérico, Γ idéntico a `_christoffel_ForwardDiff` en Float64 y Float32, 0 alocaciones en `christoffel` y en el RHS de la geodésica. Nota de medición: `@allocated` con un alias global no constante (`R = RayTracingGR`) da 192 B falsos; usar `const`. Bloque 3 completo.
+- 2026-11-13: #6 descartado por legibilidad (medición registrada en el Bloque 4).
+- 2026-11-13: #7 aplicado (`Val(4)` + comentario en `_christoffel_ForwardDiff`). `Pkg.test()` 3/3 OK; tipo inferido correcto y 0 alocaciones en Float64/Float32.
