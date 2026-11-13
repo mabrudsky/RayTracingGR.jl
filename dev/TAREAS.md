@@ -192,7 +192,7 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 </details>
 
 <details>
-<summary><b>Bloque 4: GPU</b></summary>
+<summary><b>Bloque 4: GPU ✅ completo (2026-11-13)</b></summary>
 
 - [-] #6 ~~Contracción directa de Γ sin armar el SArray completo~~ — **DESCARTADO por legibilidad** (2026-11-13)
 
@@ -209,8 +209,17 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 
   Sin cambio medible en CPU (`christoffel` 65 ns, 0 alocaciones, tipo inferido `SArray{Tuple{4,4,4},T}` en
   Float64 y Float32): la ganancia es la garantía de tamaño fijo al compilar en kernels de GPU.
-- [ ] #8 Resolver con `save_everystep=false, save_start=false`; `initial_data` tiene que ser una
-  `Matrix` de CPU.
+- [x] #8 Parte 2: `initial_data` tiene que estar en la CPU (2026-11-13)
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/propagate/ensemble.jl` | Chequeo en `Ensemble_Problem`: `KA.get_backend(initial_data) isa KA.CPU`, si no `ArgumentError` claro. |
+
+  Motivo: DiffEqGPU 3.20.1 corre `prob_func` en la CPU (`solve.jl`, línea 199) y lee una columna de
+  `initial_data` por rayo; un arreglo de GPU daría lectura escalar (lentísima o error). Se usa
+  `get_backend` en lugar de `isa Array` para aceptar arreglos de CPU como `view` o `transpose`.
+  La parte 1 (`save_everystep = false`, `save_start = false`) pasó a la tarea del backend/`solve`
+  (más abajo), porque la librería todavía no llama a `solve`.
 
 </details>
 
@@ -256,7 +265,7 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 ---
 
-- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Idea: `solve(ep, GPUTsit5(), DiffEqGPU.EnsembleGPUKernel(configuration.backend); ...)`.
+- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Idea: `solve(ep, GPUTsit5(), DiffEqGPU.EnsembleGPUKernel(configuration.backend); trajectories = n, save_everystep = false, save_start = false, dt = ...)`. Parte 1 del #8: sin `save_everystep = false` DiffEqGPU reserva `pasos × rayos` en la GPU (`lowerlevel_solve.jl`, líneas 83-85; p. ej. 10⁶ rayos × 1000 pasos × 8 Float32 = 32 GB, contra 32 MB solo con el estado final); `output_func` filtra recién después de integrar. Falta decidir integrador (`GPUTsit5`, `GPUVern7`, ...) y `dt`.
 
 - [ ] (2026-11-13, para: sin fecha) **Sección "Cómo citar" del README**: está oculta en un comentario HTML (`<!-- ... -->`). `CITATION.bib` ya corregido (versión `v0.1.0`, email `@gmail.com`); falta decidir cuándo mostrarla (descomentar).
 
@@ -298,3 +307,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: #11 aplicado (fallback `christoffel` para `AbstractSpacetime`, se borra el método de Kerr, `ChristoffelTag` sin abstracto). `metric_inverse` genérico postergado (tarea nueva). `Pkg.test()` 3/3 OK. Chequeo manual: Kerr usa el método genérico, Γ idéntico a `_christoffel_ForwardDiff` en Float64 y Float32, 0 alocaciones en `christoffel` y en el RHS de la geodésica. Nota de medición: `@allocated` con un alias global no constante (`R = RayTracingGR`) da 192 B falsos; usar `const`. Bloque 3 completo.
 - 2026-11-13: #6 descartado por legibilidad (medición registrada en el Bloque 4).
 - 2026-11-13: #7 aplicado (`Val(4)` + comentario en `_christoffel_ForwardDiff`). `Pkg.test()` 3/3 OK; tipo inferido correcto y 0 alocaciones en Float64/Float32.
+- 2026-11-13: #8 parte 2 aplicada (chequeo `KA.get_backend(initial_data) isa KA.CPU`). `Pkg.test()` 3/3 OK. Chequeo manual: `Matrix`, `view` y `transpose` aceptados; arreglo con backend GPU (simulado) → `ArgumentError`. Parte 1 movida a la tarea del backend/`solve`. Bloque 4 completo.

@@ -13,6 +13,7 @@ function Ensemble_Problem(configuration::Configuration{N,T,S,E,B}, initial_data:
     numtype(configuration.spacetime) === T || throw(ArgumentError("spacetime uses $(numtype(configuration.spacetime)) but u0 uses $T; use the same precision (e.g. KerrSchildCoordinates(M = 1f0, a = 0.5f0) for Float32)"))
     size(initial_data, 1) == N || throw(DimensionMismatch("Each column of initial_data must be an initial condition. Expected size $N, got $(size(initial_data, 1))"))
     eltype(initial_data) === T || throw(ArgumentError("initial_data must have element type $T"))
+    KA.get_backend(initial_data) isa KA.CPU || throw(ArgumentError("initial_data must be a CPU array, because prob_func runs on the CPU; got $(typeof(initial_data))"))
 
     (; u0, spacetime, tspan, equations) = configuration
     p           = IntegrationParameters(spacetime)
