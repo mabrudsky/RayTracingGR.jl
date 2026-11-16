@@ -164,7 +164,7 @@ RayTracingGR.jl/
 │   │   ├── equations.jl              # RHS: geodésica y transporte paralelo
 │   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
 │   │   └── Callback/
-│   │       └── callback.jl           # regiones de integración por escenario (PulsarRegion) + boundary_callback
+│   │       └── callback.jl           # regiones de integración (PulsarRegion) + boundary_callback (CPU: Continuous, GPU: Discrete)
 │
 ├── test/
 │   ├── runtests.jl

@@ -59,16 +59,19 @@ julia --project=test/gpu -e "using Pkg; Pkg.instantiate()"
 julia -t auto --project=test/gpu test/gpu/callback_gpu.jl
 ```
 
-`callback_gpu.jl` prueba `boundary_callback` (`ContinuousCallback` + `terminate!`) con `GPUTsit5` y
-`EnsembleGPUKernel(CUDABackend())` en Float32:
+`callback_gpu.jl` prueba `boundary_callback(region, CUDABackend())` con `GPUTsit5` y
+`EnsembleGPUKernel(CUDABackend())` en Float32. Con un backend de GPU, `boundary_callback` devuelve un
+`DiscreteCallback` + bisección sobre la interpolación del integrador, todo `@inline`
+(`ContinuousCallback` hace que el integrador escape a la memoria dinámica de la GPU: issue #219 de DiffEqGPU).
+El script muestra:
 
 1. si el kernel aloca memoria dentro de la GPU (`gpu_malloc`, causa del error "Out of dynamic GPU memory");
 2. corridas con cada vez más rayos (variable `NRAYS`, por defecto `10000,100000,1000000`): cuántos rayos
    pegan en la estrella, cuántos escapan, distancia máxima al borde y tiempo;
 3. comparación con la CPU (`Tsit5` + `EnsembleThreads`) en los primeros `NCPU` rayos.
 
-Si `ContinuousCallback` falla, prueba la alternativa `DiscreteCallback` + interpolación a mano
-(`FALLBACK = "true"`, por defecto). Sin una GPU NVIDIA disponible, ejecuta el kernel en la CPU.
+Con `TRY_CONTINUOUS=true` prueba además `ContinuousCallback` en la GPU (al final, porque falla por el
+#219). Sin una GPU NVIDIA disponible, ejecuta el kernel en la CPU.
 Ejemplo con otros tamaños: `NRAYS=100000,5000000 julia -t auto --project=test/gpu test/gpu/callback_gpu.jl`.
 
 En Julia 1.10, `test/gpu/Project.toml` no reconoce la sección `[sources]`: la primera vez hay que correr

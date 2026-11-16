@@ -262,18 +262,32 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
       | Archivo | Cambio |
       |---|---|
       | `src/propagate/propagate_types.jl` | `abstract type AbstractRegion <: AbstractPropagate end` |
-      | `src/propagate/Callback/callback.jl` | `PulsarRegion{T}(R_in, R_out)` (isbits, constructores como las métricas); `region_condition` = $(r - R_\text{in})(R_\text{out} - r)$ con `coordinate_radius`; `boundary_callback(termination)` → `ContinuousCallback(condition, terminate!)`, lee el espacio-tiempo de `integrator.p`. Reemplaza el código viejo comentado. |
+      | `src/propagate/Callback/callback.jl` | `PulsarRegion{T}(R_in, R_out)` (isbits, constructores como las métricas); `region_condition` = $(r - R_\text{in})(R_\text{out} - r)$ con `coordinate_radius`; `boundary_callback(region)` → `ContinuousCallback(condition, terminate!)` (luego elegido según el backend, ver abajo), lee el espacio-tiempo de `integrator.p`. Reemplaza el código viejo comentado. |
       | `src/RayTracingGR.jl` | Exporta `PulsarRegion`, `boundary_callback`. |
       | `test/propagate/callback_tests.jl` | Constructores, isbits (también de la condición del callback), condición en KS y BL, y 40 rayos integrados con `Tsit5` y con `GPUTsit5` en `EnsembleGPUKernel(CPU())`, Float64 y Float32. |
 
-      Uso: `solve(ep, GPUTsit5(), EnsembleGPUKernel(backend); callback = boundary_callback(termination), merge_callbacks = true, save_everystep = false, ...)`; en CPU con `Tsit5()` y `EnsembleThreads()` (sin `merge_callbacks`).
-    - [ ] Confirmar en GPU real (A30): `ContinuousCallback` en `EnsembleGPUKernel` daba "Out of dynamic GPU
-      memory" (issue #219 del usuario, ene. 2023, sigue abierto). Si falla: `DiscreteCallback` + interpolación
-      a mano (ya probado en CPU, mismo resultado).
-      Script: `test/gpu/callback_gpu.jl` (entorno propio en `test/gpu/`). Correr con
-      `julia -t auto --project=test/gpu test/gpu/callback_gpu.jl` (la primera vez, `Pkg.instantiate()`).
-      Probado en CPU (sin GPU): 1000 y 5000 rayos, todos en el borde, igual que la CPU; la alternativa
-      Discrete + interp. da lo mismo. Falta correrlo en la A30 y pegar acá el resultado.
+      Uso: `cb = boundary_callback(region, configuration)`; GPU: `solve(ep, GPUTsit5(), EnsembleGPUKernel(backend); callback = cb, merge_callbacks = true, save_everystep = false, ...)`; CPU: `Tsit5()` y `EnsembleThreads()` (sin `merge_callbacks`).
+    - [x] Primera prueba en la A30 (2026-11-16, DiffEqGPU 3.21.6, CUDA.jl 6): **fallan las dos**,
+      `ContinuousCallback` y la alternativa `DiscreteCallback` + bisección del script, con
+      "Out of dynamic GPU memory (trying to allocate 664 bytes)".
+      Causa (verificada): el integrador de la GPU es un `struct` mutable; si se pasa a una función que no se
+      inlinea, escapa al heap de la GPU (664 B por hilo). DiffEqGPU lo arregló con `@inline` en el PR #207
+      (dic. 2022) "when not using Continuous callbacks"; para `ContinuousCallback` sigue abierto el #219
+      (el PR #221 que lo intentaba se cerró sin integrar; los tests oficiales usan 2 trayectorias). En el
+      script, `affect!` e `inside` no eran `@inline`.
+      Medición con el kernel en CPU (bytes alocados por rayo; 636 B es la base de todas las variantes):
+      Continuous 1452, Continuous con condición `@inline` 1372, Discrete + bisección sin `@inline` 1308,
+      **Discrete + bisección todo `@inline` 636** (sin escape). `DiscreteCallback` + `terminate!` solo
+      (como en 2023) no escapa en GPU pero corta un paso después del borde (9/2000 en el borde).
+    - [x] `boundary_callback` elige el callback según el backend (decisión del usuario: automático):
+      `boundary_callback(region, configuration)` o `boundary_callback(region, backend)`;
+      `KA.CPU` → `ContinuousCallback` + `terminate!`; `KA.GPU` → `DiscreteCallback` + bisección (50 pasos)
+      sobre `integrator(t)` + `change_t_via_interpolation!` + `terminate!`, todo `@inline`.
+      Tests: tipo de callback según backend, isbits de condición y `affect!`, rayos en el borde con el
+      kernel sobre la CPU (Float64/Float32).
+    - [ ] Confirmar en la A30 con `test/gpu/callback_gpu.jl` actualizado (usa `boundary_callback(region, CUDABackend())`;
+      `TRY_CONTINUOUS=true` agrega `ContinuousCallback` al final). Probado en CPU: todos los rayos en el borde,
+      igual que la CPU.
   - [x] Parte 2: se borró `src/Document/Chat_Copilot/analisis_raytracing.md` (notas de Copilot desactualizadas; quedan en el historial de git).
   - [x] Parte 3: se borró `src/configuration/utils_config_path.jl` (todo comentado, de otro proyecto) y su `include` en `configuration.jl`.
   - [x] Parte 4: en `_christoffel_ForwardDiff` el argumento `k` pasó a llamarse `spacetime` (`k` es el momento del fotón en el resto del código). El bloque comentado de abajo no se tocó.
@@ -406,3 +420,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-16: Corte del púlsar implementado con `ContinuousCallback` + `terminate!` (`PulsarTermination`, `termination_condition`, `termination_callback`), igual para CPU y GPU. `Pkg.test()` 138/138 OK (incluye integración en CPU y en el kernel de GPU sobre la CPU). Falta probar en la A30.
 - 2026-11-16: Nombres del corte cambiados a pedido del usuario: `AbstractTermination` → `AbstractRegion`, `PulsarTermination` → `PulsarRegion`, `termination_condition` → `region_condition`, `termination_callback` → `boundary_callback`. Uso: `boundary_callback(PulsarRegion(R_in = 5f0, R_out = 50f0))`.
 - 2026-11-16: DiffEqGPU actualizado a 3.21.6 (compat `3.21`); `Pkg.test()` 138/138 OK. Creado `test/gpu/` (Project.toml con CUDA + `callback_gpu.jl`) para probar `boundary_callback` en la A30: alocaciones en el kernel, escala de rayos, comparación con CPU y alternativa Discrete + interp. Probado en CPU. README y CONTRIBUTING actualizados.
+- 2026-11-16: A30: fallaron ContinuousCallback y la alternativa Discrete del script ("Out of dynamic GPU memory", 664 B). Causa: escape del integrador (falta de `@inline`; #207/#219 de DiffEqGPU). `boundary_callback(region, backend|configuration)` ahora elige: CPU → ContinuousCallback, GPU → DiscreteCallback + bisección `@inline` (sin escape: 636 B/rayo como la base). `Pkg.test()` 144/144. `test/gpu/callback_gpu.jl` actualizado; falta confirmarlo en la A30.

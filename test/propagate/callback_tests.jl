@@ -61,15 +61,23 @@ end
                              backend = KernelAbstractions.CPU(), u0 = SVector{8,T}(data[:, 1]),
                              tspan = (zero(T), T(500)))
     ep   = RTC.Ensemble_Problem(cfg, data)
-    cb   = boundary_callback(region)
-    @test isbits(cb.condition)                      # the condition travels to the GPU kernel
+
+    # The type of callback is chosen from the backend
+    cb_cpu = boundary_callback(region, cfg)                 # configuration.backend = CPU()
+    cb_gpu = boundary_callback(region, FakeGPUBackend())    # any KernelAbstractions.GPU (defined in ensemble_tests.jl)
+    @test cb_cpu isa SciMLBase.ContinuousCallback
+    @test cb_gpu isa SciMLBase.DiscreteCallback
+    @test boundary_callback(region, KernelAbstractions.CPU()) isa SciMLBase.ContinuousCallback
+    @test isbits(cb_gpu.condition) && isbits(cb_gpu.affect!)   # they travel to the GPU kernel
+
     tol  = T == Float64 ? T(1e-10) : T(1e-6)
     atol_border = T == Float64 ? 1e-10 : 1e-3
 
-    cpu = SciMLBase.solve(ep, Tsit5(), SciMLBase.EnsembleThreads(); trajectories = n, callback = cb,
+    # CPU: Tsit5 + ContinuousCallback; GPU kernel (run on the CPU): GPUTsit5 + DiscreteCallback with bisection
+    cpu = SciMLBase.solve(ep, Tsit5(), SciMLBase.EnsembleThreads(); trajectories = n, callback = cb_cpu,
                           save_everystep = false, save_start = false, abstol = tol, reltol = tol)
     gpu = SciMLBase.solve(ep, GPUTsit5(), EnsembleGPUKernel(KernelAbstractions.CPU()); trajectories = n,
-                          callback = cb, merge_callbacks = true, adaptive = true,
+                          callback = cb_gpu, merge_callbacks = true, adaptive = true,
                           save_everystep = false, save_start = false, abstol = tol, reltol = tol)
 
     r_cpu = [coordinate_radius(spacetime, SVector(u[1], u[2], u[3], u[4])) for u in cpu.u]
