@@ -240,8 +240,12 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
   | `README.md`, `CONTRIBUTING.md` | Árbol de carpetas; tabla de tests y sección "Benchmarks". |
 
   Tests: 3 → 54.
-- [ ] #16 Callback de terminación (horizonte / radio máximo); mover `src/Document` a `docs/`; sacar
-  `utils_config_path.jl`; renombrar `k` → `st` en `_christoffel_ForwardDiff`.
+- [~] #16 Varios (2026-11-16: hechas las partes 2, 3 y 4; falta la 1)
+  - [ ] Parte 1: callback de terminación. **En espera**: el usuario va a explicar sus consideraciones.
+    Propuesta de la revisión: terminar si $r < r_+(1+\varepsilon)$ (captura) o $r > r_\text{max}$ (escape).
+  - [x] Parte 2: se borró `src/Document/Chat_Copilot/analisis_raytracing.md` (notas de Copilot desactualizadas; quedan en el historial de git).
+  - [x] Parte 3: se borró `src/configuration/utils_config_path.jl` (todo comentado, de otro proyecto) y su `include` en `configuration.jl`.
+  - [x] Parte 4: en `_christoffel_ForwardDiff` el argumento `k` pasó a llamarse `spacetime` (`k` es el momento del fotón en el resto del código). El bloque comentado de abajo no se tocó.
 
 </details>
 
@@ -365,3 +369,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: Bloque 6 pasado a desplegable junto a los Bloques 1–5, con notación LaTeX; se quitó la tarea ya cumplida "Continuar con el Bloque 2".
 - 2026-11-13: #15 aplicado. `Pkg.test()` 54/54 OK (antes 3). Benchmark: `julia --project=benchmark benchmark/benchmarks.jl` da los mismos tiempos (christoffel ~66 ns, 0 alocaciones).
 - 2026-11-13: Dependencias `OrdinaryDiffEqTsit5` (compat `2.1`, instalada 2.1.5) y `OrdinaryDiffEqVerner` (compat `2.4`, instalada 2.4.2) agregadas (opción A: mismos métodos en CPU y GPU). Todavía sin código que las use (tarea del `solve`). Medido el costo por paso (tabla en esa tarea). `Pkg.test()` 54/54 OK.
+- 2026-11-16: #16 partes 2, 3 y 4 aplicadas (borrados `src/Document/` y `utils_config_path.jl`; `k` → `spacetime` en `_christoffel_ForwardDiff`). README actualizado (árbol y diagrama). Parte 1 (callback) en espera de las consideraciones del usuario.

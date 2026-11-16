@@ -16,12 +16,12 @@ function christoffel end
 end
 
 
-@inline function _christoffel_ForwardDiff(k::AbstractSpacetime, position::SVector{4,T}) where T
+@inline function _christoffel_ForwardDiff(spacetime::AbstractSpacetime, position::SVector{4,T}) where T
     # Val(4): fixed size known at compile time (unrolled loops, required for GPU kernels)
     xd   = SVector{4, Dual{ChristoffelTag,T,4}}(ntuple(i -> Dual{ChristoffelTag,T,4}(position[i], Partials(ntuple(j -> T(i == j), Val(4)))), Val(4)))
-    gd   = metric(k, xd)    # SMatrix{4,4,Dual}
+    gd   = metric(spacetime, xd)    # SMatrix{4,4,Dual}
     ∂g   = partials.(gd)    # ∂g[μ,ν][σ] = ∂g_{μν}/∂x^σ
-    ginv = metric_inverse(k, position)
+    ginv = metric_inverse(spacetime, position)
     return @SArray [_Γcomp(ginv, ∂g, λ, μ, ν) for μ in 1:4, ν in 1:4, λ in 1:4]
 end
 

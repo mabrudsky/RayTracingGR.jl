@@ -116,8 +116,7 @@ RayTracingGR.jl/
 │   │
 │   ├── configuration/
 │   │   ├── configuration.jl          # punto de entrada (includes)
-│   │   ├── config_types.jl           # IntegrationParameters, Configuration
-│   │   └── utils_config_path.jl      # (comentado, sin uso)
+│   │   └── config_types.jl           # IntegrationParameters, Configuration
 │   │
 │   ├── spacetime/
 │   │   ├── spacetime.jl              # punto de entrada; declara metric / metric_inverse
@@ -134,8 +133,6 @@ RayTracingGR.jl/
 │   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
 │   │   └── Callback/
 │   │       └── callback.jl           # (comentado, a rehacer)
-│   │
-│   └── Document/Chat_Copilot/analisis_raytracing.md   # notas (a mover a docs/)
 │
 ├── test/
 │   ├── runtests.jl
@@ -165,7 +162,6 @@ flowchart TD
     A[RayTracingGR.jl] --> B[RayTracing_types.jl]
     A --> C[configuration/configuration.jl]
     C --> C1[config_types.jl]
-    C --> C2[utils_config_path.jl]
     A --> D[spacetime/spacetime.jl]
     D --> D1[spacetime_types.jl]
     D --> D2[christoffel.jl]
