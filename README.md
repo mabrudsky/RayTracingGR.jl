@@ -10,7 +10,8 @@ polarización, sobre un espacio-tiempo curvo. Usa ensembles de
 [DiffEqGPU.jl](https://github.com/SciML/DiffEqGPU.jl) para propagar muchos rayos en paralelo.
 
 > **Estado:** en desarrollo (v0.1.0). Hoy se pueden usar la métrica de Kerr en coordenadas de
-> Kerr-Schild, su inversa y los símbolos de Christoffel. La propagación de rayos está en construcción.
+> Kerr-Schild y de Boyer-Lindquist, su inversa y los símbolos de Christoffel. La propagación de rayos
+> está en construcción.
 
 ---
 
@@ -39,6 +40,10 @@ x  = SVector(0.0, 3.0, 0.05, 1.0)                   # (t, x, y, z)
 g    = metric(st, x)          # g_{μν}    :: SMatrix{4,4}
 ginv = metric_inverse(st, x)  # g^{μν}    :: SMatrix{4,4}
 Γ    = christoffel(st, x)     # Γ^λ_{μν}  :: SArray{Tuple{4,4,4}}, guardado como Γ[μ, ν, λ]
+
+bl = Kerr.BoyerLindquistCoordinates(M = 1.0, a = 0.5)  # también: Kerr.BoyerLindquistCoordinates(1.0, 0.5)
+q  = SVector(0.0, 3.0, 1.0, 0.5)                       # (t, r, θ, φ)
+g  = metric(bl, q)                                     # mismas funciones para cualquier espacio-tiempo
 ```
 
 `M` y `a` tienen que ser los dos `Float32` o los dos `Float64`. Además, se exige `M ≥ 0` y `|a| ≤ M`.
@@ -49,6 +54,7 @@ ginv = metric_inverse(st, x)  # g^{μν}    :: SMatrix{4,4}
 |---|---|
 | Signatura | $(-,+,+,+)$ |
 | Coordenadas de Kerr-Schild | $x^\mu = (t, x, y, z)$ |
+| Coordenadas de Boyer-Lindquist | $x^\mu = (t, r, \theta, \phi)$ |
 | Christoffel | `Γ[μ, ν, λ]` $= \Gamma^{\lambda}{}_{\mu\nu}$ (índice superior en la **última** posición) |
 | Estado de una geodésica | $u = (x^\mu, k^\mu)$: 8 componentes |
 | Estado con transporte paralelo | $u = (x^\mu, k^\mu, e_x^\mu, e_y^\mu)$: 16 componentes |
@@ -80,6 +86,30 @@ r^2 = \frac{1}{2}\left(\rho^2 - a^2\right) + \sqrt{\frac{1}{4}\left(\rho^2 - a^2
 \qquad
 \rho^2 = x^2 + y^2 + z^2 .
 $$
+
+**Métrica de Kerr en coordenadas de Boyer-Lindquist**
+
+$$
+ds^2 = -\left(1 - \frac{2Mr}{\Sigma}\right) dt^2
+- \frac{4Mar\sin^2\theta}{\Sigma}\, dt\, d\phi
++ \frac{\Sigma}{\Delta}\, dr^2
++ \Sigma\, d\theta^2
++ \left(r^2 + a^2 + \frac{2Ma^2 r \sin^2\theta}{\Sigma}\right) \sin^2\theta\, d\phi^2
+$$
+
+con
+
+$$
+\Sigma = r^2 + a^2\cos^2\theta,
+\qquad
+\Delta = r^2 - 2Mr + a^2 .
+$$
+
+Las dos métricas describen el mismo espacio-tiempo. Se pasa de Boyer-Lindquist a Kerr-Schild con
+$x + iy = (r + ia)\, e^{i\phi_{KS}} \sin\theta$, $z = r\cos\theta$,
+$dt_{KS} = dt + \frac{2Mr}{\Delta}\, dr$ y $d\phi_{KS} = d\phi + \frac{a}{\Delta}\, dr$.
+Boyer-Lindquist es singular en los horizontes ($\Delta = 0$) y en el eje ($\sin\theta = 0$);
+Kerr-Schild no tiene problemas en los horizontes.
 
 ---
 
@@ -124,7 +154,8 @@ RayTracingGR.jl/
 │   │   ├── christoffel.jl            # christoffel genérico (fallback) vía ForwardDiff
 │   │   └── Kerr/
 │   │       ├── Kerr.jl               # submódulo `Kerr`
-│   │       └── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, numtype
+│   │       ├── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, numtype
+│   │       └── BoyerLindquistCoordinates.jl  # struct + metric, metric_inverse, numtype
 │   │
 │   ├── propagate/
 │   │   ├── propagate.jl              # punto de entrada (includes)
@@ -138,7 +169,10 @@ RayTracingGR.jl/
 │   ├── runtests.jl
 │   ├── metric/
 │   │   ├── christoffel_tests_KerrSchildCoordinates.jl  # ∇g = 0 (Float64 y Float32)
-│   │   └── kerr_schild_tests.jl      # constructores, isbits, cero alocaciones
+│   │   ├── kerr_schild_tests.jl      # constructores, isbits, cero alocaciones
+│   │   ├── christoffel_tests_BoyerLindquistCoordinates.jl  # ∇g = 0 (Float64 y Float32)
+│   │   └── boyer_lindquist_tests.jl  # constructores, isbits, alocaciones, g·g⁻¹ = I, det g,
+│   │                                 # igual a Kerr-Schild transformada, límite a = 0
 │   └── propagate/
 │       └── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
 │
@@ -168,6 +202,7 @@ flowchart TD
     D --> D3["function metric end<br/>function metric_inverse end"]
     D --> K["Kerr/Kerr.jl<br/>(module Kerr)"]
     K --> K1[KerrSchildCoordinates.jl]
+    K --> K2[BoyerLindquistCoordinates.jl]
     A --> E[propagate/propagate.jl]
     E --> E1[propagate_types.jl]
     E --> E2[equations.jl]
@@ -202,7 +237,8 @@ flowchart LR
 AbstractRayTracing
 ├── AbstractSpacetime
 │   └── AbstractKerrSpacetime
-│       └── KerrSchildCoordinates{T}          (M, a, topology)
+│       ├── KerrSchildCoordinates{T}          (M, a, topology = CartesianCoordinate)
+│       └── BoyerLindquistCoordinates{T}      (M, a, topology = SphericalCoordinate)
 ├── AbstractCoordinate                        → valores del campo `topology`
 │   ├── CartesianCoordinate
 │   └── SphericalCoordinate
