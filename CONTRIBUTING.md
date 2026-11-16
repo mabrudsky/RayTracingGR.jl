@@ -42,7 +42,7 @@ julia --project=. -e "using Pkg; Pkg.test()"
 | `test/metric/christoffel_tests_BoyerLindquistCoordinates.jl` | ∇g = 0 en Boyer-Lindquist (Float64 y Float32), con tolerancia relativa al tamaño de la métrica. |
 | `test/metric/boyer_lindquist_tests.jl` | Constructores, isbits y cero alocaciones; $g\,g^{-1} = I$; $\det g = -\Sigma^2\sin^2\theta$; igual a Kerr-Schild transformada; mismo `coordinate_radius` en los dos sistemas; límite $a = 0$ (Schwarzschild). |
 | `test/propagate/ensemble_tests.jl` | Los chequeos de `Ensemble_Problem` (largo de `u0`, precisión, filas y tipo de `initial_data`, `initial_data` en la CPU) y que las ecuaciones no aloquen memoria. |
-| `test/propagate/callback_tests.jl` | `PulsarRegion` (constructores, isbits, condición en Kerr-Schild y Boyer-Lindquist) y el corte con `boundary_callback`: rayos integrados con `Tsit5` (CPU) y con `GPUTsit5` en `EnsembleGPUKernel(CPU())` (el código del kernel de GPU, ejecutado en la CPU); todos terminan en $R_\text{in}$ o $R_\text{out}$ y los dos dan el mismo estado final. |
+| `test/propagate/callback_tests.jl` | `PulsarRegion` (constructores, isbits, condición en Kerr-Schild y Boyer-Lindquist) y el corte con `boundary_callback(region, backend)`: con `CPU()` devuelve un `ContinuousCallback` y con un backend de GPU un `DiscreteCallback` (isbits). Rayos integrados con `Tsit5` + la versión de CPU y con `GPUTsit5` en `EnsembleGPUKernel(CPU())` + la versión de GPU (el código del kernel de GPU, ejecutado en la CPU); todos terminan en $R_\text{in}$ o $R_\text{out}$ y los dos dan el mismo estado final. |
 
 Las alocaciones se miden dentro de una función: medidas en el ámbito global (o con un alias global
 no constante) dan resultados falsos.

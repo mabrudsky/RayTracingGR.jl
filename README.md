@@ -251,9 +251,11 @@ AbstractRayTracing
 │   ├── IntegrationParameters{S}              → viaja a la GPU como `p`
 │   └── Configuration{N, T, S, E, B}          → se queda en la CPU
 └── AbstractPropagate
-    └── AbstractEquationSet                   → el tipo de ecuación define la física (vacío, ...)
-        ├── GeodesicEquationsVacuum
-        └── ParallelTransportEquationsVacuum
+    ├── AbstractEquationSet                   → el tipo de ecuación define la física (vacío, ...)
+    │   ├── GeodesicEquationsVacuum
+    │   └── ParallelTransportEquationsVacuum
+    └── AbstractRegion                        → región donde se integra cada rayo (cortes)
+        └── PulsarRegion{T}                   (R_in, R_out)
 
 ChristoffelTag                                (tag de ForwardDiff, fuera de la jerarquía)
 ```
