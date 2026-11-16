@@ -13,7 +13,7 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-DiffEqGPU = "3.21"
+DiffEqGPU = "3.16"
 ForwardDiff = "0.10, 1"
 KernelAbstractions = "0.9"
 OrdinaryDiffEqTsit5 = "2.1"

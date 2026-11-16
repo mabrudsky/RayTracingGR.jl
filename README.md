@@ -26,6 +26,15 @@ Requiere Julia 1.10 o posterior. Para correr en GPU hay que instalar además el 
 [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) (NVIDIA), [AMDGPU.jl](https://github.com/JuliaGPU/AMDGPU.jl),
 [Metal.jl](https://github.com/JuliaGPU/Metal.jl) (Apple) u [oneAPI.jl](https://github.com/JuliaGPU/oneAPI.jl) (Intel).
 
+Se recomienda instalarla en un entorno propio, para que no choque con versiones viejas de otros
+paquetes instalados en el entorno global:
+
+```julia
+using Pkg
+Pkg.activate("raytracing"; shared = true)   # entorno "raytracing"; en sesiones nuevas: julia --project=@raytracing
+Pkg.add(url = "https://github.com/mabrudsky/RayTracingGR.jl")
+```
+
 ---
 
 # Uso rápido

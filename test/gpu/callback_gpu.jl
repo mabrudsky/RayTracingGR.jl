@@ -28,20 +28,26 @@ const CALLBACK_BACKEND = USE_GPU ? BACKEND : NoGPU()
 
 free_gpu_memory() = isdefined(CUDA, :free_memory) ? CUDA.free_memory() : CUDA.available_memory()   # CUDA.jl 6 / 5
 
-println("="^88)
-println("Device      : ", USE_GPU ? CUDA.name(CUDA.device()) : "no NVIDIA GPU available -> GPU kernel on the CPU")
-USE_GPU && @printf("GPU memory  : %.2f GiB free of %.2f GiB\n", free_gpu_memory() / 2^30, CUDA.total_memory() / 2^30)
-println("Versions    : Julia ", VERSION, " | DiffEqGPU ", pkgversion(DiffEqGPU), " | CUDA.jl ", pkgversion(CUDA),
-        " | KernelAbstractions ", pkgversion(KernelAbstractions))
-println("Threads     : ", Threads.nthreads(), " | rays per run: ", NRAYS)
-println("="^88)
-
 # ---------------- scenario: pulsar in Kerr-Schild coordinates, Float32 ----------------
 const T         = Float32
 const spacetime = Kerr.KerrSchildCoordinates(T(1), T(0.1))
 const region    = PulsarRegion(R_in = T(5), R_out = T(50))
 const tspan     = (zero(T), T(500))
 const tol       = (abstol = T(1e-6), reltol = T(1e-6))
+
+const LINE = "="^96
+println(LINE)
+println("TEST: stopping the rays at the boundary of the region (boundary_callback) on the GPU")
+println(LINE)
+println("Scenario     : pulsar, Kerr spacetime in Kerr-Schild coordinates (M = 1, a = 0.1).")
+println("               Photons are emitted between r = 8 and r = 15 in random directions and are")
+println("               integrated until they reach the star surface (r = ", region.R_in, ") or the outer radius (r = ", region.R_out, ").")
+println("               Precision Float32, tolerance 1e-6, integrator GPUTsit5.")
+println("Device       : ", USE_GPU ? CUDA.name(CUDA.device()) : "no NVIDIA GPU available -> the GPU code runs on the CPU")
+USE_GPU && @printf("GPU memory   : %.2f GiB free of %.2f GiB\n", free_gpu_memory() / 2^30, CUDA.total_memory() / 2^30)
+println("Software     : Julia ", VERSION, ", DiffEqGPU ", pkgversion(DiffEqGPU), ", CUDA.jl ", pkgversion(CUDA),
+        ", KernelAbstractions ", pkgversion(KernelAbstractions))
+println("CPU threads  : ", Threads.nthreads(), " (used only for the comparison with the CPU)")
 
 # Photons emitted between r = 8 and r = 15 in random directions, null momentum (g_{μν} k^μ k^ν = 0)
 function pulsar_rays(n)
@@ -85,31 +91,50 @@ function classify(us, n)
     worst   = maximum(min(abs(r - region.R_in), abs(r - region.R_out)) for r in rs)
     return (hit = hit, escaped = escaped, other = n - hit - escaped, worst = worst)
 end
+verdict(ok) = ok ? "OK" : "FAILED"
 
-methods = TRY_CONTINUOUS ? (("library GPU (Discrete)", cb_gpu), ("ContinuousCallback", cb_continuous)) :
-                           (("library GPU (Discrete)", cb_gpu),)
+methods = TRY_CONTINUOUS ? (("GPU callback of the library", cb_gpu), ("ContinuousCallback (optional)", cb_continuous)) :
+                           (("GPU callback of the library", cb_gpu),)
+all_ok   = true
+failures = String[]
 
-# ---------------- 1) allocations inside the GPU kernel (cause of issue #219) ----------------
-# Must run before any other solve: the kernel is inspected when it is compiled.
+# ---------------- 1) memory requested by the GPU code while it runs (cause of issue #219) ----------------
+# Must run before any other solve: the GPU code is inspected when it is compiled.
+println("\n", LINE)
+println("[1] Does the GPU code request memory while it runs?")
+println("    If it does, many rays at once fill the GPU memory and the run stops with")
+println("    \"Out of dynamic GPU memory\". The right answer is NO.")
+println(LINE)
 if USE_GPU
-    println("\n1) Allocations inside the GPU kernel (gpu_malloc / gpu_gc_pool_alloc)")
     for (name, cb) in methods
         try
             ep = ensemble_problem(pulsar_rays(32))
             ir = sprint(io -> CUDA.@device_code_llvm io = io dump_module = true solve_gpu(ep, 32, cb))
             allocs = occursin("gpu_malloc", ir) || occursin("gpu_gc_pool_alloc", ir)
-            println("   ", rpad(name, 24), allocs ? "ALLOCATES inside the kernel (problem of #219)" : "no allocations inside the kernel")
+            @printf("    %-32s %-5s -> %s\n", name, allocs ? "YES" : "NO", verdict(!allocs))
+            if allocs && name == "GPU callback of the library"
+                global all_ok = false; push!(failures, "the GPU code of the library requests memory while it runs")
+            end
         catch e
-            println("   ", rpad(name, 24), "could not be inspected: ", first(sprint(showerror, e), 200))
+            @printf("    %-32s could not be checked: %s\n", name, first(sprint(showerror, e), 160))
         end
     end
 else
-    println("\n1) Allocations inside the GPU kernel: skipped (needs a working NVIDIA GPU)")
+    println("    Skipped: it needs a working NVIDIA GPU.")
 end
 
 # ---------------- 2) runs of increasing size ----------------
-println("\n2) Runs with GPUTsit5 + EnsembleGPUKernel, Float32, tol = 1e-6")
-@printf("   %-24s %10s %10s %10s %8s %14s %10s\n", "callback", "rays", "hit star", "escaped", "other", "max |r-border|", "time [s]")
+println("\n", LINE)
+println("[2] Integration on the GPU with more and more rays")
+println("    Each ray must stop exactly on one of the two boundaries:")
+println("      - hit the star   : stopped at the star surface (r = ", region.R_in, ")")
+println("      - escaped        : stopped at the outer radius (r = ", region.R_out, ")")
+println("      - not stopped    : did not reach any boundary. Must be 0.")
+println("      - largest error  : largest distance between a ray and its boundary (Float32: about 1e-5 to 1e-4)")
+println("      - time           : time of the GPU integration, in seconds")
+println(LINE)
+@printf("    %-32s %10s %13s %10s %12s %14s %9s  %s\n", "callback", "rays", "hit the star", "escaped",
+        "not stopped", "largest error", "time [s]", "result")
 largest = Dict{String,Any}()
 for (name, cb) in methods
     for n in NRAYS
@@ -118,28 +143,58 @@ for (name, cb) in methods
             solve_gpu(ep, min(n, 64), cb)                      # compilation
             t   = @elapsed (sol = solve_gpu(ep, n, cb))
             c   = classify(sol.u, n)
-            @printf("   %-24s %10d %10d %10d %8d %14.2e %10.3f\n", name, n, c.hit, c.escaped, c.other, c.worst, t)
+            ok  = c.other == 0 && c.worst < 1f-3 * region.R_out
+            @printf("    %-32s %10d %13d %10d %12d %14.1e %9.3f  %s\n", name, n, c.hit, c.escaped, c.other, c.worst, t, verdict(ok))
             largest[name] = (n = n, data = data, us = sol.u)
+            if !ok && name == "GPU callback of the library"
+                global all_ok = false; push!(failures, "$(c.other) of $n rays did not stop at a boundary")
+            end
         catch e
-            @printf("   %-24s %10d  ERROR: %s\n", name, n, first(sprint(showerror, e), 160))
+            @printf("    %-32s %10d  ERROR: %s  %s\n", name, n, first(sprint(showerror, e), 120), verdict(false))
+            if name == "GPU callback of the library"
+                global all_ok = false; push!(failures, "the GPU run with $n rays stopped with an error")
+            end
             break
         end
     end
 end
 
-# ---------------- 3) comparison with the CPU (Tsit5 + ContinuousCallback, EnsembleThreads) ----------------
-println("\n3) Comparison with the CPU (Tsit5 + boundary_callback(region, CPU())) on the first ", NCPU, " rays")
-for (name, run) in largest
+# ---------------- 3) comparison with the CPU ----------------
+println("\n", LINE)
+println("[3] Do the GPU and the CPU give the same result?")
+println("    The first rays are integrated again on the CPU (reference: Tsit5 + ContinuousCallback)")
+println("    and compared ray by ray with the GPU.")
+println(LINE)
+for (name, _) in methods
+    haskey(largest, name) || continue
+    run   = largest[name]
     n     = min(NCPU, run.n)
     ep    = ensemble_problem(run.data[:, 1:n])
     cpu   = solve_cpu(ep, n, cb_cpu)
     c_cpu = classify(cpu.u, n); c_gpu = classify(run.us, n)
     same  = count(i -> (radius(cpu.u[i]) < 10) == (radius(run.us[i]) < 10), 1:n)
     rel   = maximum(maximum(abs.(cpu.u[i] .- run.us[i]) ./ max.(1, abs.(cpu.u[i]))) for i in 1:n)
-    @printf("   %-24s CPU hit/escaped %d/%d | GPU %d/%d | same border %d/%d | max rel. diff %.2e\n",
-            name, c_cpu.hit, c_cpu.escaped, c_gpu.hit, c_gpu.escaped, same, n, rel)
+    ok    = same == n && rel < 1e-2
+    println("    ", name, " (", n, " rays):")
+    @printf("      rays that hit the star          : CPU %d, GPU %d\n", c_cpu.hit, c_gpu.hit)
+    @printf("      rays that escaped               : CPU %d, GPU %d\n", c_cpu.escaped, c_gpu.escaped)
+    @printf("      rays that end on the same boundary on CPU and GPU : %d of %d\n", same, n)
+    @printf("      largest relative difference of the final state   : %.1e  (Float32: about 1e-5 to 1e-3)\n", rel)
+    println("      result: ", verdict(ok))
+    if !ok && name == "GPU callback of the library"
+        global all_ok = false; push!(failures, "the GPU and the CPU do not give the same result")
+    end
 end
 
-println("\n", "="^88)
-println("Copy this output and paste it in the conversation (or in dev/TAREAS.md, #16 part 1).")
-println("="^88)
+println("\n", LINE)
+if all_ok && USE_GPU
+    println("SUMMARY: OK. The rays stop at the boundary on the GPU, without memory errors,")
+    println("         and the GPU gives the same result as the CPU.")
+elseif all_ok
+    println("SUMMARY: OK, but without a GPU: the GPU code ran on the CPU and the memory check [1]")
+    println("         was skipped. Run this test on a machine with an NVIDIA GPU.")
+else
+    println("SUMMARY: FAILED.")
+    foreach(f -> println("         - ", f), failures)
+end
+println(LINE)
