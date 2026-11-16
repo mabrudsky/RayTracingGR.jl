@@ -174,9 +174,12 @@ RayTracingGR.jl/
 │   │   ├── christoffel_tests_BoyerLindquistCoordinates.jl  # ∇g = 0 (Float64 y Float32)
 │   │   └── boyer_lindquist_tests.jl  # constructores, isbits, alocaciones, g·g⁻¹ = I, det g,
 │   │                                 # igual a Kerr-Schild transformada, límite a = 0
-│   └── propagate/
-│       ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
-│       └── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
+│   ├── propagate/
+│   │   ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
+│   │   └── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
+│   └── gpu/                          # prueba en GPU real (se corre a mano, no en el CI)
+│       ├── Project.toml              # entorno propio (CUDA, DiffEqGPU, ...)
+│       └── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)

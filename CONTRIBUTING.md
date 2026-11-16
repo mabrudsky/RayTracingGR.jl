@@ -47,6 +47,33 @@ julia --project=. -e "using Pkg; Pkg.test()"
 Las alocaciones se miden dentro de una función: medidas en el ámbito global (o con un alias global
 no constante) dan resultados falsos.
 
+# Prueba en GPU
+
+El CI no tiene GPU: `Pkg.test()` ejecuta el código del kernel de GPU en la CPU
+(`EnsembleGPUKernel(CPU())`). La prueba en una GPU NVIDIA real está en `test/gpu/`, con su propio
+entorno (CUDA, DiffEqGPU, ...), y se corre a mano:
+
+```julia
+# desde la carpeta del proyecto (la primera vez: instantiate)
+julia --project=test/gpu -e "using Pkg; Pkg.instantiate()"
+julia -t auto --project=test/gpu test/gpu/callback_gpu.jl
+```
+
+`callback_gpu.jl` prueba `boundary_callback` (`ContinuousCallback` + `terminate!`) con `GPUTsit5` y
+`EnsembleGPUKernel(CUDABackend())` en Float32:
+
+1. si el kernel aloca memoria dentro de la GPU (`gpu_malloc`, causa del error "Out of dynamic GPU memory");
+2. corridas con cada vez más rayos (variable `NRAYS`, por defecto `10000,100000,1000000`): cuántos rayos
+   pegan en la estrella, cuántos escapan, distancia máxima al borde y tiempo;
+3. comparación con la CPU (`Tsit5` + `EnsembleThreads`) en los primeros `NCPU` rayos.
+
+Si `ContinuousCallback` falla, prueba la alternativa `DiscreteCallback` + interpolación a mano
+(`FALLBACK = "true"`, por defecto). Sin una GPU NVIDIA disponible, ejecuta el kernel en la CPU.
+Ejemplo con otros tamaños: `NRAYS=100000,5000000 julia -t auto --project=test/gpu test/gpu/callback_gpu.jl`.
+
+En Julia 1.10, `test/gpu/Project.toml` no reconoce la sección `[sources]`: la primera vez hay que correr
+`Pkg.develop(path = ".")` con `--project=test/gpu` en lugar de `Pkg.instantiate()`.
+
 # Benchmarks
 
 Los tiempos (`@btime`) no son parte de los tests: están en `benchmark/benchmarks.jl`, con su propio

@@ -270,6 +270,10 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
     - [ ] Confirmar en GPU real (A30): `ContinuousCallback` en `EnsembleGPUKernel` daba "Out of dynamic GPU
       memory" (issue #219 del usuario, ene. 2023, sigue abierto). Si falla: `DiscreteCallback` + interpolación
       a mano (ya probado en CPU, mismo resultado).
+      Script: `test/gpu/callback_gpu.jl` (entorno propio en `test/gpu/`). Correr con
+      `julia -t auto --project=test/gpu test/gpu/callback_gpu.jl` (la primera vez, `Pkg.instantiate()`).
+      Probado en CPU (sin GPU): 1000 y 5000 rayos, todos en el borde, igual que la CPU; la alternativa
+      Discrete + interp. da lo mismo. Falta correrlo en la A30 y pegar acá el resultado.
   - [x] Parte 2: se borró `src/Document/Chat_Copilot/analisis_raytracing.md` (notas de Copilot desactualizadas; quedan en el historial de git).
   - [x] Parte 3: se borró `src/configuration/utils_config_path.jl` (todo comentado, de otro proyecto) y su `include` en `configuration.jl`.
   - [x] Parte 4: en `_christoffel_ForwardDiff` el argumento `k` pasó a llamarse `spacetime` (`k` es el momento del fotón en el resto del código). El bloque comentado de abajo no se tocó.
@@ -401,3 +405,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-16: `coordinate_radius(spacetime, point)` agregado en cada métrica (Kerr-Schild: radio de Kerr r; Boyer-Lindquist: point[2]), declarado en spacetime.jl y exportado. Tests: eje, ecuador, punto general, mismo r en KS y BL, 0 alocaciones. `Pkg.test()` 110/110 OK. Experimento de callbacks registrado en #16 parte 1.
 - 2026-11-16: Corte del púlsar implementado con `ContinuousCallback` + `terminate!` (`PulsarTermination`, `termination_condition`, `termination_callback`), igual para CPU y GPU. `Pkg.test()` 138/138 OK (incluye integración en CPU y en el kernel de GPU sobre la CPU). Falta probar en la A30.
 - 2026-11-16: Nombres del corte cambiados a pedido del usuario: `AbstractTermination` → `AbstractRegion`, `PulsarTermination` → `PulsarRegion`, `termination_condition` → `region_condition`, `termination_callback` → `boundary_callback`. Uso: `boundary_callback(PulsarRegion(R_in = 5f0, R_out = 50f0))`.
+- 2026-11-16: DiffEqGPU actualizado a 3.21.6 (compat `3.21`); `Pkg.test()` 138/138 OK. Creado `test/gpu/` (Project.toml con CUDA + `callback_gpu.jl`) para probar `boundary_callback` en la A30: alocaciones en el kernel, escala de rayos, comparación con CPU y alternativa Discrete + interp. Probado en CPU. README y CONTRIBUTING actualizados.
