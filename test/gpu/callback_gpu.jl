@@ -22,7 +22,8 @@ const FALLBACK = get(ENV, "FALLBACK", "true") == "true"
 
 println("="^88)
 println("Device      : ", USE_GPU ? CUDA.name(CUDA.device()) : "no NVIDIA GPU available -> GPU kernel on the CPU")
-USE_GPU && @printf("GPU memory  : %.2f GiB free of %.2f GiB\n", CUDA.available_memory() / 2^30, CUDA.total_memory() / 2^30)
+free_gpu_memory() = isdefined(CUDA, :free_memory) ? CUDA.free_memory() : CUDA.available_memory()   # CUDA.jl 6 / 5
+USE_GPU && @printf("GPU memory  : %.2f GiB free of %.2f GiB\n", free_gpu_memory() / 2^30, CUDA.total_memory() / 2^30)
 println("Versions    : Julia ", VERSION, " | DiffEqGPU ", pkgversion(DiffEqGPU), " | CUDA.jl ", pkgversion(CUDA),
         " | KernelAbstractions ", pkgversion(KernelAbstractions))
 println("Threads     : ", Threads.nthreads(), " | rays per run: ", NRAYS)
