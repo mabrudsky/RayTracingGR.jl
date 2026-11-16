@@ -9,5 +9,6 @@ include("christoffel.jl")
 function metric end
 function metric_inverse end
 function numtype end        # numtype(spacetime) -> Float32 or Float64 (precision of the spacetime parameters)
+function coordinate_radius end   # coordinate_radius(spacetime, point) -> radius associated with each coordinate system (used for the cuts)
 
 include("Kerr/Kerr.jl")

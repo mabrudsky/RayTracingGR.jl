@@ -127,7 +127,8 @@ Todo el código que corre dentro de un kernel de GPU sigue estas reglas:
   métrica con números duales de ForwardDiff (`Dual`), que también son isbits.
 - **Todo genérico a partir de la métrica**: como `christoffel`, cada magnitud física se escribe como
   una función genérica de `(spacetime, x)` que solo usa `metric`, `metric_inverse` y sus derivadas con
-  Duales. Una métrica nueva solo define su struct (con `topology`), `metric` y `metric_inverse`.
+  Duales. Una métrica nueva solo define su struct (con `topology`), `metric`, `metric_inverse`,
+  `numtype` y `coordinate_radius` (el radio propio de su sistema de coordenadas, usado para los cortes).
 
 ---
 
@@ -149,7 +150,7 @@ RayTracingGR.jl/
 │   │   └── config_types.jl           # IntegrationParameters, Configuration
 │   │
 │   ├── spacetime/
-│   │   ├── spacetime.jl              # punto de entrada; declara metric / metric_inverse
+│   │   ├── spacetime.jl              # punto de entrada; declara metric / metric_inverse / numtype / coordinate_radius
 │   │   ├── spacetime_types.jl        # AbstractKerrSpacetime, tipos de coordenadas
 │   │   ├── christoffel.jl            # christoffel genérico (fallback) vía ForwardDiff
 │   │   └── Kerr/
@@ -159,11 +160,11 @@ RayTracingGR.jl/
 │   │
 │   ├── propagate/
 │   │   ├── propagate.jl              # punto de entrada (includes)
-│   │   ├── propagate_types.jl        # subtipos abstractos de propagación (hoy vacío)
+│   │   ├── propagate_types.jl        # subtipos abstractos de propagación (AbstractRegion)
 │   │   ├── equations.jl              # RHS: geodésica y transporte paralelo
 │   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
 │   │   └── Callback/
-│   │       └── callback.jl           # (comentado, a rehacer)
+│   │       └── callback.jl           # regiones de integración por escenario (PulsarRegion) + boundary_callback
 │
 ├── test/
 │   ├── runtests.jl
@@ -174,7 +175,8 @@ RayTracingGR.jl/
 │   │   └── boyer_lindquist_tests.jl  # constructores, isbits, alocaciones, g·g⁻¹ = I, det g,
 │   │                                 # igual a Kerr-Schild transformada, límite a = 0
 │   └── propagate/
-│       └── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
+│       ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
+│       └── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)

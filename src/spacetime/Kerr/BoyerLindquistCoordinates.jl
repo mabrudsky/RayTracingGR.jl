@@ -119,3 +119,9 @@ end
                                 g13, g23, g33, g43,
                                 g14, g24, g34, g44)
 end
+
+# ======================================================================= #
+# 3) coordinate_radius(spacetime, point) -> Boyer-Lindquist radius r      #
+#    It is a coordinate: point = (t, r, θ, φ).                            #
+# ======================================================================= #
+@inline coordinate_radius(spacetime::BoyerLindquistCoordinates, point::SVector{4,T}) where T = point[2]

@@ -3,7 +3,7 @@ import Test: @testset, @test, @test_throws
 import StaticArrays: SVector, SMatrix
 import LinearAlgebra: I, det
 
-# allocated_metric, allocated_metric_inverse and allocated_christoffel are defined in kerr_schild_tests.jl
+# allocated_metric, allocated_metric_inverse, allocated_christoffel and allocated_coordinate_radius are defined in kerr_schild_tests.jl
 
 # Jacobian ∂x_KS^μ / ∂x_BL^α of the change Boyer-Lindquist (t, r, θ, φ) -> Kerr-Schild (t, x, y, z):
 #   x + i y = (r + i a) e^{iφ_KS} sinθ,   z = r cosθ,
@@ -55,6 +55,8 @@ end
     @test allocated_metric(spacetime, q) == 0
     @test allocated_metric_inverse(spacetime, q) == 0
     @test allocated_christoffel(spacetime, q) == 0
+    @test allocated_coordinate_radius(spacetime, q) == 0
+    @test coordinate_radius(spacetime, q) === q[2]
 end
 
 @testset "BoyerLindquistCoordinates - the metric is correct" begin
@@ -79,9 +81,12 @@ end
         x_ks, J = bl_to_ks(M, a, q)
         g_ks = metric(Kerr.KerrSchildCoordinates(M, a), x_ks)
         @test J' * g_ks * J ≈ g rtol=1e-12 atol=1e-12
+
+        # 4) coordinate_radius gives the same Kerr radius r in both coordinate systems
+        @test coordinate_radius(Kerr.KerrSchildCoordinates(M, a), x_ks) ≈ coordinate_radius(spacetime, q) rtol=1e-13
     end
 
-    # 4) a = 0: Schwarzschild, diag(-(1 - 2M/r), 1/(1 - 2M/r), r², r² sin²θ)
+    # 5) a = 0: Schwarzschild, diag(-(1 - 2M/r), 1/(1 - 2M/r), r², r² sin²θ)
     schwarzschild = Kerr.BoyerLindquistCoordinates(M, 0.0)
     q = SVector(0.0, 5.0, 1.1, 0.3)
     r, θ = q[2], q[3]

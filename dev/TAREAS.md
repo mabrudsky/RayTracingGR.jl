@@ -241,8 +241,35 @@ cfg = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.Geodes
 
   Tests: 3 → 54.
 - [~] #16 Varios (2026-11-16: hechas las partes 2, 3 y 4; falta la 1)
-  - [ ] Parte 1: callback de terminación. **En espera**: el usuario va a explicar sus consideraciones.
-    Propuesta de la revisión: terminar si $r < r_+(1+\varepsilon)$ (captura) o $r > r_\text{max}$ (escape).
+  - [~] Parte 1: callback de terminación (en curso).
+    Consideraciones del usuario (2026-11-16): (1) cómo detectar el borde depende del sistema de coordenadas;
+    (2) depende del escenario (púlsar, disco, binaria): primero el púlsar de Skylight-Pulsar; (3) en CPU,
+    `ContinuousCallback` + `terminate!`; en GPU, si no anda, buscar otra estrategia isbits que reproduzca el
+    resultado, guardando solo el estado final; congelar el lado derecho (como Skylight-Pulsar) es la
+    **última opción**; (4) estructura intuitiva y modular, y el código no depende del sentido de
+    integración (lo deciden las etapas previa y posterior; en GPU $\lambda$ tiene que crecer, así que se
+    invierte $k^\mu$).
+    - [x] `coordinate_radius(spacetime, point)`: un método en cada archivo de métrica (Kerr-Schild: radio de
+      Kerr $r$; Boyer-Lindquist: `point[2]`). Declarado en `spacetime.jl` y exportado.
+    - [x] Experimento (fuera del repo): púlsar en Kerr-Schild ($a = 0.1$, $5 < r < 50$, 400 rayos).
+      CPU `Tsit5` y kernel `GPUTsit5` en `EnsembleGPUKernel(CPU())`, cada uno con `ContinuousCallback` +
+      `terminate!` y con `DiscreteCallback` + interpolación a mano (bisección sobre `integrator(t)` +
+      `change_t_via_interpolation!`): los cuatro cortan los 400 rayos en el borde correcto (38 en $R_\text{in}$,
+      362 en $R_\text{out}$), a 2e-14 del borde en Float64 y 3e-5 en Float32; CPU contra kernel 4e-10
+      (Float64) / 3e-5 (Float32). Igual con DiffEqGPU 3.20.1 y 3.21.6. Sin alocación extra por callback.
+    - [x] Implementado (2026-11-16), `ContinuousCallback` + `terminate!` para CPU y GPU:
+
+      | Archivo | Cambio |
+      |---|---|
+      | `src/propagate/propagate_types.jl` | `abstract type AbstractRegion <: AbstractPropagate end` |
+      | `src/propagate/Callback/callback.jl` | `PulsarRegion{T}(R_in, R_out)` (isbits, constructores como las métricas); `region_condition` = $(r - R_\text{in})(R_\text{out} - r)$ con `coordinate_radius`; `boundary_callback(termination)` → `ContinuousCallback(condition, terminate!)`, lee el espacio-tiempo de `integrator.p`. Reemplaza el código viejo comentado. |
+      | `src/RayTracingGR.jl` | Exporta `PulsarRegion`, `boundary_callback`. |
+      | `test/propagate/callback_tests.jl` | Constructores, isbits (también de la condición del callback), condición en KS y BL, y 40 rayos integrados con `Tsit5` y con `GPUTsit5` en `EnsembleGPUKernel(CPU())`, Float64 y Float32. |
+
+      Uso: `solve(ep, GPUTsit5(), EnsembleGPUKernel(backend); callback = boundary_callback(termination), merge_callbacks = true, save_everystep = false, ...)`; en CPU con `Tsit5()` y `EnsembleThreads()` (sin `merge_callbacks`).
+    - [ ] Confirmar en GPU real (A30): `ContinuousCallback` en `EnsembleGPUKernel` daba "Out of dynamic GPU
+      memory" (issue #219 del usuario, ene. 2023, sigue abierto). Si falla: `DiscreteCallback` + interpolación
+      a mano (ya probado en CPU, mismo resultado).
   - [x] Parte 2: se borró `src/Document/Chat_Copilot/analisis_raytracing.md` (notas de Copilot desactualizadas; quedan en el historial de git).
   - [x] Parte 3: se borró `src/configuration/utils_config_path.jl` (todo comentado, de otro proyecto) y su `include` en `configuration.jl`.
   - [x] Parte 4: en `_christoffel_ForwardDiff` el argumento `k` pasó a llamarse `spacetime` (`k` es el momento del fotón en el resto del código). El bloque comentado de abajo no se tocó.
@@ -371,3 +398,6 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-13: Dependencias `OrdinaryDiffEqTsit5` (compat `2.1`, instalada 2.1.5) y `OrdinaryDiffEqVerner` (compat `2.4`, instalada 2.4.2) agregadas (opción A: mismos métodos en CPU y GPU). Todavía sin código que las use (tarea del `solve`). Medido el costo por paso (tabla en esa tarea). `Pkg.test()` 54/54 OK.
 - 2026-11-16: #16 partes 2, 3 y 4 aplicadas (borrados `src/Document/` y `utils_config_path.jl`; `k` → `spacetime` en `_christoffel_ForwardDiff`). README actualizado (árbol y diagrama). Parte 1 (callback) en espera de las consideraciones del usuario.
 - 2026-11-16: Métrica de Kerr en Boyer-Lindquist (pedido del usuario): `src/spacetime/Kerr/BoyerLindquistCoordinates.jl` con struct `BoyerLindquistCoordinates{T}` (topology `SphericalCoordinate`), misma estructura que Kerr-Schild (constructores, `numtype`, auxiliar `_Σ_Δ`, `metric` y `metric_inverse` componente a componente). Tests nuevos: `christoffel_tests_BoyerLindquistCoordinates.jl` (∇g = 0, tolerancia relativa a max|g| porque g_φφ ~ r²) y `boyer_lindquist_tests.jl` (constructores, isbits, 0 alocaciones, g·g⁻¹ = I, det g = −Σ² sin²θ, igual a Kerr-Schild transformada con error ~1e-15, límite a = 0 = Schwarzschild). `LinearAlgebra` agregado a los paquetes de test. `Pkg.test()` 96/96 OK. README actualizado (estado, uso, convenciones, fórmula, árbol, diagrama, jerarquía).
+- 2026-11-16: `coordinate_radius(spacetime, point)` agregado en cada métrica (Kerr-Schild: radio de Kerr r; Boyer-Lindquist: point[2]), declarado en spacetime.jl y exportado. Tests: eje, ecuador, punto general, mismo r en KS y BL, 0 alocaciones. `Pkg.test()` 110/110 OK. Experimento de callbacks registrado en #16 parte 1.
+- 2026-11-16: Corte del púlsar implementado con `ContinuousCallback` + `terminate!` (`PulsarTermination`, `termination_condition`, `termination_callback`), igual para CPU y GPU. `Pkg.test()` 138/138 OK (incluye integración en CPU y en el kernel de GPU sobre la CPU). Falta probar en la A30.
+- 2026-11-16: Nombres del corte cambiados a pedido del usuario: `AbstractTermination` → `AbstractRegion`, `PulsarTermination` → `PulsarRegion`, `termination_condition` → `region_condition`, `termination_callback` → `boundary_callback`. Uso: `boundary_callback(PulsarRegion(R_in = 5f0, R_out = 50f0))`.

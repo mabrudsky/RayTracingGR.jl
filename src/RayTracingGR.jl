@@ -13,6 +13,9 @@ module RayTracingGR
     export Kerr
     
     # Export spacetime functions
-    export metric, metric_inverse, christoffel
+    export metric, metric_inverse, christoffel, coordinate_radius
+
+    # Export integration regions (callbacks)
+    export PulsarRegion, boundary_callback
     
 end

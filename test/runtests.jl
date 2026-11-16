@@ -7,4 +7,5 @@ using Test
     include("metric/christoffel_tests_BoyerLindquistCoordinates.jl")
     include("metric/boyer_lindquist_tests.jl")
     include("propagate/ensemble_tests.jl")
+    include("propagate/callback_tests.jl")
 end

@@ -108,3 +108,17 @@ end
                                 g13, g23, g33, g43, 
                                 g14, g24, g34, g44)
 end
+
+# ======================================================================= #
+# 3) coordinate_radius(spacetime, point) -> Kerr radius r                 #
+#    Defined implicitly by (x² + y²)/(r² + a²) + z²/r² = 1:              #
+#    r² = ½(ρ² - a²) + √(¼(ρ² - a²)² + a² z²),   ρ² = x² + y² + z²        #
+#    It is the same r as in Boyer-Lindquist coordinates.                  #
+# ======================================================================= #
+@inline function coordinate_radius(spacetime::KerrSchildCoordinates, point::SVector{4,T}) where T
+    t, x, y, z = point
+    A2   = spacetime.a^2
+    rho2 = x^2 + y^2 + z^2
+    r2   = T(0.5) * (rho2 - A2) + sqrt(T(0.25) * (rho2 - A2)^2 + A2 * z^2)
+    return sqrt(r2)
+end
