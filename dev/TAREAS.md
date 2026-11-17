@@ -352,7 +352,11 @@ Detalle en `REVISION_2026-11-12.md` §17–21. Agregados el 2026-11-12, sin fech
 
 <!-- Formato: - [ ] (YYYY-MM-DD, para: YYYY-MM-DD o "sin fecha") descripción -->
 
-- [ ] (2026-11-16, para: 2026-11-17) **Reordenar toda la carpeta `src/propagate/Callback/`**. Los callbacks
+- [x] (2026-11-16, para: 2026-11-17; hecho 2026-11-17) **Reordenar toda la carpeta `src/propagate/Callback/`**. Hecho:
+  `callback.jl` (índice: `function region_condition end`, `function boundary_callback end`, includes, método con
+  `Configuration`), `Region/PulsarRegion.jl`, `boundary_callback_cpu.jl`, `boundary_callback_gpu.jl`.
+  `AbstractRegion` queda en `propagate_types.jl`; regiones sin `module`; tests sin cambios. Texto original:
+  Los callbacks
   funcionan (CPU con `ContinuousCallback`, GPU con `DiscreteCallback` + bisección; probado en la A30 con
   10⁶ rayos), pero según el usuario la implementación **no es modular y no respeta la estructura de la
   librería**. Hoy todo está en un solo archivo, `callback.jl`: la región `PulsarRegion` (struct y
@@ -445,3 +449,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-16: A30: fallaron ContinuousCallback y la alternativa Discrete del script ("Out of dynamic GPU memory", 664 B). Causa: escape del integrador (falta de `@inline`; #207/#219 de DiffEqGPU). `boundary_callback(region, backend|configuration)` ahora elige: CPU → ContinuousCallback, GPU → DiscreteCallback + bisección `@inline` (sin escape: 636 B/rayo como la base). `Pkg.test()` 144/144. `test/gpu/callback_gpu.jl` actualizado; falta confirmarlo en la A30.
 - 2026-11-16: Instalación con `Pkg.add(url=...)` fallaba en un entorno con `PlotlyJS` (reportado por el usuario). Causa: el compat `DiffEqGPU = "3.21"` puesto hoy; DiffEqGPU ≥ 3.17 exige `Parameters` 0.13.1, y con eso `PlotlyBase` (de `PlotlyJS`) no tiene versión posible. Solo DiffEqGPU ≤ 3.16 convive con `PlotlyJS`. Compat bajado a `DiffEqGPU = "3.16"`. Verificado: el entorno del usuario (PlotlyJS + DataFrames + Parameters) instala RayTracingGR con DiffEqGPU 3.16.1; los 144 tests pasan con DiffEqGPU 3.16.1 y con 3.21.6; el callback de GPU no escapa con 3.16.1 (igual que la referencia). (Se agregó y luego se quitó del README una recomendación de entorno propio: el usuario quiere que funcione en el entorno global.) Formato nuevo, más claro, de la salida de `test/gpu/callback_gpu.jl`.
 - 2026-11-16: Prueba en la A30 OK con `boundary_callback(region, CUDABackend())` (10⁶ rayos, sin alocaciones en el kernel, igual que la CPU). Tarea para 2026-11-17: reordenar `src/propagate/Callback/` (no es modular). Documentación revisada: jerarquía de tipos del README con `AbstractRegion`/`PulsarRegion`, descripción de los tests de callback en CONTRIBUTING, estado del #16.
+- 2026-11-17: `src/propagate/Callback/` reordenado según el patrón de `spacetime/` (decisiones del usuario: `AbstractRegion` sigue en `propagate_types.jl`, regiones sin `module`, código repetido CPU/GPU aceptado porque nunca se usan los dos a la vez, tests sin cambios). `callback.jl` = índice con funciones genéricas vacías; `Region/PulsarRegion.jl`; `boundary_callback_cpu.jl`; `boundary_callback_gpu.jl` (código idéntico al anterior). `Pkg.test()` 144/144 OK. README: árbol y diagrama actualizados. Falta volver a correr `test/gpu/callback_gpu.jl` en la A30 (no debería cambiar: el código de GPU es el mismo).

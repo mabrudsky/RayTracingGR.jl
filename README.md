@@ -164,7 +164,11 @@ RayTracingGR.jl/
 │   │   ├── equations.jl              # RHS: geodésica y transporte paralelo
 │   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
 │   │   └── Callback/
-│   │       └── callback.jl           # regiones de integración (PulsarRegion) + boundary_callback (CPU: Continuous, GPU: Discrete)
+│   │       ├── callback.jl           # punto de entrada: declara region_condition y boundary_callback + includes
+│   │       ├── Region/
+│   │       │   └── PulsarRegion.jl   # struct + constructores + region_condition
+│   │       ├── boundary_callback_cpu.jl  # CPU: ContinuousCallback + terminate!
+│   │       └── boundary_callback_gpu.jl  # GPU: DiscreteCallback + bisección (@inline, sin escape del integrador)
 │
 ├── test/
 │   ├── runtests.jl
@@ -212,6 +216,10 @@ flowchart TD
     E --> E1[propagate_types.jl]
     E --> E2[equations.jl]
     E --> E3[Callback/callback.jl]
+    E3 --> E31["function region_condition end<br/>function boundary_callback end"]
+    E3 --> E32[Region/PulsarRegion.jl]
+    E3 --> E33[boundary_callback_cpu.jl]
+    E3 --> E34[boundary_callback_gpu.jl]
     E --> E4[ensemble.jl]
 ```
 
