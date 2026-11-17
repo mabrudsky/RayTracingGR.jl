@@ -229,6 +229,11 @@ para su propio tipo. `christoffel` tiene un método genérico (fallback) que sir
 espacio-tiempo: deriva `metric` con números duales. Así, todos los espacio-tiempos comparten las mismas
 funciones y el despacho múltiple elige la implementación correcta.
 
+Los callbacks siguen el mismo patrón: `Callback/callback.jl` declara `region_condition` y
+`boundary_callback`. Cada región (`Region/PulsarRegion.jl`) agrega su `region_condition`, y cada backend
+agrega su `boundary_callback`: `boundary_callback_cpu.jl` (`ContinuousCallback`) y
+`boundary_callback_gpu.jl` (`DiscreteCallback` + bisección).
+
 ## Flujo de cálculo de un rayo
 
 ```mermaid
