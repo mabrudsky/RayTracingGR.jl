@@ -122,3 +122,9 @@ end
     r2   = T(0.5) * (rho2 - A2) + sqrt(T(0.25) * (rho2 - A2)^2 + A2 * z^2)
     return sqrt(r2)
 end
+
+# ======================================================================= #
+# 4) coordinate_z(spacetime, point) -> height above the equatorial plane  #
+#    z = r cos θ. In Kerr-Schild it is the coordinate z itself.           #
+# ======================================================================= #
+@inline coordinate_z(spacetime::KerrSchildCoordinates, point::SVector{4,T}) where T = point[4]

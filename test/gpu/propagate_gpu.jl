@@ -11,6 +11,7 @@
 #   [1] the GPU code does not request memory while it runs                             #
 #   [2] runs of increasing size: every ray stops at most 3 ulp from its boundary       #
 #   [3] the GPU (Float32) gives the same result as the CPU (Float64)                   #
+#   [4] accretion disk (AccretionDiskRegion): memory, where the rays end, vs CPU       #
 # ==================================================================================== #
 import Pkg
 Pkg.activate(@__DIR__)    # environment of test/gpu/, wherever the script is called from
@@ -143,11 +144,51 @@ ok = big <= max(1, n ÷ 500) && quantile_of(rel, 0.5) < 1e-5
 println("    result: ", verdict(ok))
 ok || fail!("the GPU and the CPU do not give the same result")
 
+# ---------------- [4] accretion disk ----------------
+# Same rays, now with an accretion disk: the ray stops on the equatorial plane only inside the disk
+# (6 ≤ r ≤ 15), at R_min = 2.05 (falls) or at R_max = 50 (escapes). Crossing the plane outside the
+# disk must NOT stop it. The GPU callback is the same (sign change + bisection + Newton step).
+const disk   = AccretionDiskRegion(R_min = 2.05f0, R_max = 50f0, R_in = 6f0, R_out = 15f0)
+const disk64 = AccretionDiskRegion(R_min = 2.05, R_max = 50.0, R_in = 6.0, R_out = 15.0)
+where_it_ends(st, region, u) = begin
+    r = radius(st, u); z = coordinate_z(st, SVector(u[1], u[2], u[3], u[4]))
+    abs(r - region.R_min) < 1e-3 * region.R_max ? :fell :
+    abs(r - region.R_max) < 1e-3 * region.R_max ? :escaped :
+    (abs(z) < 1e-3 * region.R_max && region.R_in <= r <= region.R_out) ? :disk : :other
+end
+println("\n", LINE)
+println("[4] Accretion disk (AccretionDiskRegion): stops on the disk, at R_min or at R_max")
+println("    Expected: no memory inside the kernel, 0 rays ending elsewhere, same ending as the CPU (Float64).")
+println(LINE)
+let data = pulsar_rays(32)
+    ir = sprint(io -> CUDA.@device_code_llvm io = io dump_module = true propagate(configuration(spacetime, data, CUDA.CUDABackend()), data, disk))
+    allocs = occursin("gpu_malloc", ir) || occursin("gpu_gc_pool_alloc", ir)
+    println("    memory requested inside the kernel: ", allocs ? "YES" : "NO", "  -> ", verdict(!allocs))
+    allocs && fail!("the GPU code with the disk requests memory while it runs")
+end
+let n = min(NCPU, size(largest.data, 2)), data = largest.data[:, 1:n]
+    cfg = configuration(spacetime, data, CUDA.CUDABackend())
+    propagate(cfg, data[:, 1:64], disk)                                    # compilation
+    t      = @elapsed (final = propagate(cfg, data, disk))
+    ends   = [where_it_ends(spacetime, disk, final[:, j]) for j in 1:n]
+    data64 = Float64.(data); cfg64 = configuration(spacetime64, data64, KernelAbstractions.CPU())
+    cpu    = propagate(cfg64, data64, disk64)
+    ends64 = [where_it_ends(spacetime64, disk64, cpu[:, j]) for j in 1:n]
+    same   = count(ends .== ends64)
+    @printf("    rays: %d | disk %d, fell %d, escaped %d, elsewhere %d | GPU time %.3f s\n", n,
+            count(==(:disk), ends), count(==(:fell), ends), count(==(:escaped), ends), count(==(:other), ends), t)
+    @printf("    same ending on GPU (Float32) and CPU (Float64): %d of %d\n", same, n)
+    ok = count(==(:other), ends) == 0 && same >= n - max(1, n ÷ 500)
+    println("    result: ", verdict(ok))
+    ok || fail!("the disk on the GPU does not stop the rays where expected or differs from the CPU")
+end
+
 # ---------------- summary ----------------
 println("\n", LINE)
 if all_ok
     println("SUMMARY: OK. propagate works on the GPU without requesting memory inside the kernel, every ray")
-    println("         stops at most 3 ulp from its boundary, and the GPU agrees with the CPU in Float64.")
+    println("         stops at most 3 ulp from its boundary, the GPU agrees with the CPU in Float64, and the")
+    println("         accretion disk stops the rays where expected.")
 else
     println("SUMMARY: FAILED.")
     foreach(f -> println("         - ", f), failures)

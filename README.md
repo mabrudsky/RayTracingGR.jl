@@ -81,6 +81,45 @@ final = propagate(configuration = config,
 - Tolerancias por defecto: `abstol = reltol = 5 eps(T)`. Más detalle en
   [`dev/PROPAGATE_2026-11-19.md`](dev/PROPAGATE_2026-11-19.md).
 
+## Regiones: dónde se corta cada rayo
+
+La región (`region`) dice dónde se detiene cada rayo. Hay dos:
+
+| Región | El rayo se detiene | Ejemplo |
+|---|---|---|
+| `PulsarRegion(R_in, R_out)` | en $r = R_{\text{in}}$ (pega en la estrella) o en $r = R_{\text{out}}$ (escapa) | `PulsarRegion(R_in = 5.0, R_out = 50.0)` |
+| `AccretionDiskRegion(R_min, R_max, R_in, R_out)` | al cruzar el plano ecuatorial **dentro** del disco ($R_{\text{in}} \le r \le R_{\text{out}}$), en $r = R_{\min}$ (cae al agujero negro) o en $r = R_{\max}$ (escapa). Si cruza el plano **afuera** del disco, sigue. | `AccretionDiskRegion(R_min = 1.85, R_max = 6000.0, R_in = 1.85, R_out = 15.0)` |
+
+$r$ es el radio de cada sistema de coordenadas (`coordinate_radius`) y $z = r\cos\theta$ la altura sobre el
+plano ecuatorial (`coordinate_z`); las dos regiones funcionan en Kerr-Schild y en Boyer-Lindquist.
+$R_{\min}$ lo elige el usuario (por ejemplo $r_+ + 0.05$, como en Skylight): la librería no calcula el
+horizonte, porque no es una cantidad local.
+
+**Cómo funciona.** Cada región define dos funciones:
+
+1. `region_condition(region, spacetime, x)`: una función $c(x)$ que **cambia de signo** en cada superficie
+   donde el rayo puede detenerse. Para el púlsar $c = (r - R_{\text{in}})(R_{\text{out}} - r)$; para el disco
+
+   $$
+   c = (r - R_{\min})\,(R_{\max} - r)\; z ,
+   $$
+
+   que cambia de signo en $r = R_{\min}$, en $r = R_{\max}$ y en el plano $z = 0$.
+2. `stops_at_boundary(region, spacetime, x)`: en el punto donde $c$ cambió de signo, decide si el rayo se
+   detiene. Por defecto siempre (púlsar). Para el disco, en el plano solo si $R_{\text{in}} \le r \le R_{\text{out}}$.
+
+El callback que arma `propagate` usa esas dos funciones, igual en CPU y en GPU:
+
+| | CPU (`ContinuousCallback`) | GPU (`DiscreteCallback`, todo `@inline` e isbits) |
+|---|---|---|
+| Detecta el cruce | el `ContinuousCallback` busca la raíz de $c$ | $c$ cambió de signo entre el paso anterior y el actual |
+| Ubica el cruce | búsqueda de raíz del `ContinuousCallback` | bisección sobre la interpolación del paso |
+| Si `stops_at_boundary` es verdadero | detiene el rayo en el cruce | lleva el estado al cruce, un paso de Newton lo deja sobre $c = 0$ y detiene el rayo |
+| Si es falso | el rayo sigue | no toca el integrador: el rayo sigue |
+
+Para agregar una región nueva: un archivo en `src/propagate/Callback/Region/` con el `struct` (isbits), su
+`region_condition` y, si algún cruce no debe detener el rayo, su `stops_at_boundary`.
+
 ## Convenciones
 
 | Elemento | Convención |
@@ -226,7 +265,7 @@ RayTracingGR.jl/
 │   │   ├── christoffel.jl            # christoffel genérico (fallback) vía ForwardDiff
 │   │   └── Kerr/
 │   │       ├── Kerr.jl               # submódulo `Kerr`
-│   │       ├── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, numtype
+│   │       ├── KerrSchildCoordinates.jl  # struct + metric, metric_inverse, numtype, coordinate_radius, coordinate_z
 │   │       └── BoyerLindquistCoordinates.jl  # struct + metric, metric_inverse, numtype
 │   │
 │   ├── propagate/
@@ -237,7 +276,8 @@ RayTracingGR.jl/
 │   │   ├── Callback/
 │   │   │   ├── callback.jl           # punto de entrada: declara region_condition y boundary_callback + includes
 │   │   │   ├── Region/
-│   │   │   │   └── PulsarRegion.jl   # struct + constructores + region_condition
+│   │   │   │   ├── PulsarRegion.jl   # struct + constructores + region_condition
+│   │   │   │   └── AccretionDiskRegion.jl  # disco: region_condition + stops_at_boundary
 │   │   │   ├── boundary_callback_cpu.jl  # CPU: ContinuousCallback + terminate!
 │   │   │   └── boundary_callback_gpu.jl  # GPU: DiscreteCallback + bisección + paso de Newton (@inline)
 │   │   └── Solve/
@@ -256,12 +296,13 @@ RayTracingGR.jl/
 │   ├── propagate/
 │   │   ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
 │   │   ├── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
+│   │   ├── disk_region_tests.jl      # disco: pega, cruza el plano afuera, cae, escapa (CPU y kernel de GPU)
 │   │   ├── solve_tests.jl            # propagate: valores por defecto, Float64 (Vern9), Float32, errores
 │   │   └── constants_of_motion_tests.jl  # 𝒩, E, L_z y Carter Q se conservan a lo largo de los rayos
 │   └── gpu/                          # prueba en GPU real (se corre a mano, no en el CI)
 │       ├── Project.toml              # entorno propio (CUDA, DiffEqGPU, ...)
 │       ├── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
-│       └── propagate_gpu.jl          # propagate en GPU: memoria, corte en ulp (con/sin Newton), comparación con CPU Float64
+│       └── propagate_gpu.jl          # propagate en GPU: memoria, corte en ulp, comparación con CPU Float64, disco
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)
@@ -297,8 +338,8 @@ flowchart TD
     E --> E1[propagate_types.jl]
     E --> E2[equations.jl]
     E --> E3[Callback/callback.jl]
-    E3 --> E31["function region_condition end<br/>function boundary_callback end"]
-    E3 --> E32[Region/PulsarRegion.jl]
+    E3 --> E31["function region_condition end<br/>function stops_at_boundary end<br/>function boundary_callback end"]
+    E3 --> E32[Region/PulsarRegion.jl<br/>Region/AccretionDiskRegion.jl]
     E3 --> E33[boundary_callback_cpu.jl]
     E3 --> E34[boundary_callback_gpu.jl]
     E --> E4[ensemble.jl]
@@ -314,8 +355,9 @@ para su propio tipo. `christoffel` tiene un método genérico (fallback) que sir
 espacio-tiempo: deriva `metric` con números duales. Así, todos los espacio-tiempos comparten las mismas
 funciones y el despacho múltiple elige la implementación correcta.
 
-Los callbacks siguen el mismo patrón: `Callback/callback.jl` declara `region_condition` y
-`boundary_callback`. Cada región (`Region/PulsarRegion.jl`) agrega su `region_condition`, y cada backend
+Los callbacks siguen el mismo patrón: `Callback/callback.jl` declara `region_condition`,
+`stops_at_boundary` (por defecto `true`) y `boundary_callback`. Cada región (`Region/PulsarRegion.jl`,
+`Region/AccretionDiskRegion.jl`) agrega su `region_condition` y, si hace falta, su `stops_at_boundary`; cada backend
 agrega su `boundary_callback`: `boundary_callback_cpu.jl` (`ContinuousCallback`) y
 `boundary_callback_gpu.jl` (`DiscreteCallback` + bisección + un paso de Newton que deja el rayo sobre el
 borde).
@@ -363,7 +405,8 @@ AbstractRayTracing
     │   ├── GeodesicEquationsVacuum
     │   └── ParallelTransportEquationsVacuum
     └── AbstractRegion                        → región donde se integra cada rayo (cortes)
-        └── PulsarRegion{T}                   (R_in, R_out)
+        ├── PulsarRegion{T}                   (R_in, R_out)
+        └── AccretionDiskRegion{T}            (R_min, R_max, R_in, R_out)
 
 ChristoffelTag                                (tag de ForwardDiff, fuera de la jerarquía)
 ```

@@ -125,3 +125,9 @@ end
 #    It is a coordinate: point = (t, r, θ, φ).                            #
 # ======================================================================= #
 @inline coordinate_radius(spacetime::BoyerLindquistCoordinates, point::SVector{4,T}) where T = point[2]
+
+# ======================================================================= #
+# 4) coordinate_z(spacetime, point) -> height above the equatorial plane  #
+#    z = r cos θ, the same z as in Kerr-Schild coordinates.               #
+# ======================================================================= #
+@inline coordinate_z(spacetime::BoyerLindquistCoordinates, point::SVector{4,T}) where T = point[2] * cos(point[3])
