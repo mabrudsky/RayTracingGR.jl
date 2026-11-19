@@ -3,3 +3,4 @@
 /docs/build/
 /benchmark/Manifest*.toml
 /test/gpu/Manifest*.toml
+/test/gpu/*/Manifest*.toml

@@ -1,10 +1,18 @@
 # ==================================================================================== #
-# Test of propagate on a real NVIDIA GPU. Not part of Pkg.test() (the CI has no GPU).  #
-# Run (the script activates its own environment, test/gpu/, from any folder):          #
-#   julia -t auto test/gpu/propagate_gpu.jl          # from the project folder         #
-#   julia -t auto propagate_gpu.jl                   # from test/gpu/                  #
-# The first time, Pkg.instantiate() installs the packages of test/gpu/Project.toml.    #
+# Test of propagate on a real GPU. Not part of Pkg.test() (the CI has no GPU).         #
+# The GPU is chosen with the environment variable GPU (default: metal on macOS, cuda   #
+# on Linux / Windows). Each GPU has its own environment and backend file:              #
+#   GPU=cuda   : NVIDIA, CUDA.jl      environment test/gpu/         backend_cuda.jl    #
+#   GPU=amdgpu : AMD, AMDGPU.jl       environment test/gpu/amdgpu/  backend_amdgpu.jl  #
+#   GPU=oneapi : Intel, oneAPI.jl     environment test/gpu/oneapi/  backend_oneapi.jl  #
+#   GPU=metal  : Apple, Metal.jl      environment test/gpu/metal/   backend_metal.jl   #
+# Only CUDA has been tested on a real GPU (A30); the others are written but untested.  #
+# Run (the script activates the right environment, from any folder):                   #
+#   julia -t auto test/gpu/propagate_gpu.jl              # default GPU of this system   #
+#   GPU=amdgpu julia -t auto test/gpu/propagate_gpu.jl   # another GPU                  #
+# The first time, Pkg.instantiate() installs the packages of the environment.          #
 # Options (environment variables):                                                     #
+#   GPU   = "cuda" | "amdgpu" | "oneapi" | "metal"                                     #
 #   NRAYS = "10000,100000,1000000"   number of rays of each run                        #
 #   NCPU  = "10000"                  rays compared against the CPU (Float64)           #
 # Checks:                                                                              #
@@ -13,23 +21,38 @@
 #   [3] the GPU (Float32) gives the same result as the CPU (Float64)                   #
 #   [4] accretion disk (AccretionDiskRegion): memory, where the rays end, vs CPU       #
 # ==================================================================================== #
-import Pkg
-Pkg.activate(@__DIR__)    # environment of test/gpu/, wherever the script is called from
-Pkg.instantiate()         # installs what is missing (only the first time)
+const GPU_KIND = lowercase(get(ENV, "GPU", Sys.isapple() ? "metal" : "cuda"))
+GPU_KIND in ("cuda", "amdgpu", "oneapi", "metal") ||
+    error("GPU = \"$GPU_KIND\" is not supported; use cuda, amdgpu, oneapi or metal")
 
-using RayTracingGR, StaticArrays, KernelAbstractions, CUDA, DiffEqGPU
+import Pkg
+Pkg.activate(GPU_KIND == "cuda" ? (@__DIR__) : joinpath(@__DIR__, GPU_KIND))   # environment of the chosen GPU
+Pkg.instantiate()                                                           # installs what is missing (only the first time)
+
+using RayTracingGR, StaticArrays, KernelAbstractions, DiffEqGPU
 using Random, Printf
 const RT = RayTracingGR
+include(joinpath(@__DIR__, "backend_$(GPU_KIND).jl"))   # gpu_backend(), gpu_functional(), gpu_device_name(), ...
 
 const LINE = "="^100
-if !CUDA.functional()
-    println(LINE, "\nNo working NVIDIA GPU found: this test needs one. Nothing was run.\n", LINE)
+if !gpu_functional()
+    println(LINE, "\nNo working GPU found ($(GPU_NAME)): this test needs one. Nothing was run.\n", LINE)
     exit(1)
 end
 
 const NRAYS = parse.(Int, split(get(ENV, "NRAYS", "10000,100000,1000000"), ","))
 const NCPU  = parse(Int, get(ENV, "NCPU", "10000"))
-free_gpu_memory() = isdefined(CUDA, :free_memory) ? CUDA.free_memory() : CUDA.available_memory()   # CUDA.jl 6 / 5
+
+# Memory check of the GPU code: prints "could not be checked" if the backend does not support it
+function check_kernel_memory(label, f)
+    try
+        allocs = kernel_allocates(f)
+        println("    memory requested inside the kernel: ", allocs ? "YES" : "NO", "  -> ", verdict(!allocs))
+        allocs && fail!("the GPU code $label requests memory while it runs")
+    catch e
+        println("    could not be checked on this GPU: ", first(sprint(showerror, e), 200))
+    end
+end
 
 # ---------------- scenario: pulsar in Kerr-Schild coordinates ----------------
 const spacetime   = Kerr.KerrSchildCoordinates(1f0, 0.1f0)   # GPU: Float32
@@ -72,12 +95,14 @@ println("TEST: propagate on the GPU")
 println(LINE)
 println("Scenario   : pulsar, Kerr in Kerr-Schild coordinates (M = 1, a = 0.1). Photons emitted between")
 println("             r = 8 and r = 15, integrated until r = ", region.R_in, " (star) or r = ", region.R_out, " (escape).")
-println("Call       : propagate(configuration, initial_data, region) with backend = CUDA.CUDABackend(), Float32")
-println("Defaults   : ", nameof(typeof(RT.default_algorithm(CUDA.CUDABackend()))), ", abstol = reltol = 5 eps(Float32) = ",
+println("Call       : propagate(configuration, initial_data, region) with backend = ", nameof(typeof(gpu_backend())), "(), Float32")
+println("Defaults   : ", nameof(typeof(RT.default_algorithm(gpu_backend()))), ", abstol = reltol = 5 eps(Float32) = ",
         RT.default_tolerance(Float32))
-println("Device     : ", CUDA.name(CUDA.device()))
-@printf("GPU memory : %.2f GiB free of %.2f GiB\n", free_gpu_memory() / 2^30, CUDA.total_memory() / 2^30)
-println("Software   : Julia ", VERSION, ", DiffEqGPU ", pkgversion(DiffEqGPU), ", CUDA.jl ", pkgversion(CUDA))
+println("GPU        : ", GPU_NAME)
+println("Device     : ", try gpu_device_name() catch; "(unknown)" end)
+println("GPU memory : ", try gpu_memory_text() catch; "(unknown)" end)
+println("Float64    : ", KernelAbstractions.supports_float64(gpu_backend()) ? "supported" : "NOT supported by this GPU (only Float32)")
+println("Software   : Julia ", VERSION, ", DiffEqGPU ", pkgversion(DiffEqGPU), ", KernelAbstractions ", pkgversion(KernelAbstractions))
 @printf("ulp        : ulp(5) = %.1e, ulp(50) = %.1e  (smallest possible distance to each boundary in Float32)\n",
         eps(region.R_in), eps(region.R_out))
 
@@ -88,10 +113,7 @@ println("[1] Does the GPU code request memory while it runs?")
 println("    If it does, many rays fill the GPU memory (\"Out of dynamic GPU memory\"). Expected: NO.")
 println(LINE)
 let data = pulsar_rays(32)
-    ir = sprint(io -> CUDA.@device_code_llvm io = io dump_module = true propagate(configuration(spacetime, data, CUDA.CUDABackend()), data, region))
-    allocs = occursin("gpu_malloc", ir) || occursin("gpu_gc_pool_alloc", ir)
-    println("    memory requested inside the kernel: ", allocs ? "YES" : "NO", "  -> ", verdict(!allocs))
-    allocs && fail!("the GPU code requests memory while it runs")
+    check_kernel_memory("(pulsar)", () -> propagate(configuration(spacetime, data, gpu_backend()), data, region))
 end
 
 # ---------------- [2] runs of increasing size ----------------
@@ -106,7 +128,7 @@ println(LINE)
 largest = nothing
 for n in NRAYS
     data = pulsar_rays(n)
-    cfg  = configuration(spacetime, data, CUDA.CUDABackend())
+    cfg  = configuration(spacetime, data, gpu_backend())
     propagate(cfg, data[:, 1:min(n, 64)], region)               # compilation
     t     = @elapsed (final = propagate(cfg, data, region))
     rs    = [radius(spacetime, final[:, j]) for j in 1:n]
@@ -161,13 +183,10 @@ println("[4] Accretion disk (AccretionDiskRegion): stops on the disk, at R_min o
 println("    Expected: no memory inside the kernel, 0 rays ending elsewhere, same ending as the CPU (Float64).")
 println(LINE)
 let data = pulsar_rays(32)
-    ir = sprint(io -> CUDA.@device_code_llvm io = io dump_module = true propagate(configuration(spacetime, data, CUDA.CUDABackend()), data, disk))
-    allocs = occursin("gpu_malloc", ir) || occursin("gpu_gc_pool_alloc", ir)
-    println("    memory requested inside the kernel: ", allocs ? "YES" : "NO", "  -> ", verdict(!allocs))
-    allocs && fail!("the GPU code with the disk requests memory while it runs")
+    check_kernel_memory("(disk)", () -> propagate(configuration(spacetime, data, gpu_backend()), data, disk))
 end
 let n = min(NCPU, size(largest.data, 2)), data = largest.data[:, 1:n]
-    cfg = configuration(spacetime, data, CUDA.CUDABackend())
+    cfg = configuration(spacetime, data, gpu_backend())
     propagate(cfg, data[:, 1:64], disk)                                    # compilation
     t      = @elapsed (final = propagate(cfg, data, disk))
     ends   = [where_it_ends(spacetime, disk, final[:, j]) for j in 1:n]

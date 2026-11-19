@@ -300,9 +300,14 @@ RayTracingGR.jl/
 │   │   ├── solve_tests.jl            # propagate: valores por defecto, Float64 (Vern9), Float32, errores
 │   │   └── constants_of_motion_tests.jl  # 𝒩, E, L_z y Carter Q se conservan a lo largo de los rayos
 │   └── gpu/                          # prueba en GPU real (se corre a mano, no en el CI)
-│       ├── Project.toml              # entorno propio (CUDA, DiffEqGPU, ...)
-│       ├── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
-│       └── propagate_gpu.jl          # propagate en GPU: memoria, corte en ulp, comparación con CPU Float64, disco
+│       ├── Project.toml              # entorno NVIDIA (CUDA, DiffEqGPU, ...)
+│       ├── amdgpu/ oneapi/ metal/    # entornos AMD (AMDGPU.jl), Intel (oneAPI.jl), Apple (Metal.jl)
+│       ├── backend_cuda.jl           # lo que depende de cada GPU: backend, nombre, memoria,
+│       ├── backend_amdgpu.jl         #   chequeo de memoria dentro del kernel
+│       ├── backend_oneapi.jl         #   (AMD, Intel y Apple: escritos, sin probar en GPU real)
+│       ├── backend_metal.jl
+│       ├── callback_gpu.jl           # boundary_callback en GPU (solo CUDA): escala, memoria, comparación con CPU
+│       └── propagate_gpu.jl          # propagate en GPU (GPU=cuda|amdgpu|oneapi|metal): memoria, corte en ulp, CPU Float64, disco
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)

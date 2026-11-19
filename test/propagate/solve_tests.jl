@@ -10,6 +10,10 @@ import DiffEqGPU: GPUTsit5
 const RTS = RayTracingGR
 # Uses pulsar_rays (callback_tests.jl) and FakeGPUBackend (ensemble_tests.jl)
 
+# GPU backend without Float64, like Metal (Apple GPUs)
+struct NoFloat64GPUBackend <: KernelAbstractions.GPU end
+KernelAbstractions.supports_float64(::NoFloat64GPUBackend) = false
+
 pulsar_configuration(spacetime, data, backend) =
     RTS.Configuration(spacetime = spacetime, equations = RTS.GeodesicEquationsVacuum(), backend = backend,
                       u0 = SVector{8}(data[:, 1]), tspan = (zero(eltype(data)), eltype(data)(500)))
@@ -80,4 +84,10 @@ end
     @test_throws ArgumentError propagate(cpu, data, region; trajectories = 2)
     @test_throws ArgumentError propagate(cpu, data, region; batch_size = 10)
     @test_throws ArgumentError propagate(cpu, data, region; merge_callbacks = false)
+
+    # A GPU without Float64 (like Apple GPUs with Metal): clear error before compiling the kernel
+    nof64 = pulsar_configuration(spacetime, data, NoFloat64GPUBackend())
+    @test_throws ArgumentError propagate(nof64, data, region)
+    err = try propagate(nof64, data, region) catch e; e end
+    @test occursin("does not support Float64", err.msg)
 end

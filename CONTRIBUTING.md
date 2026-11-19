@@ -80,6 +80,27 @@ Ejemplo con otros tamaños: `NRAYS=100000,5000000 julia -t auto --project=test/g
 En Julia 1.10, `test/gpu/Project.toml` no reconoce la sección `[sources]`: la primera vez hay que correr
 `Pkg.develop(path = ".")` con `--project=test/gpu` en lugar de `Pkg.instantiate()`.
 
+**`propagate_gpu.jl`** prueba `propagate` completo en una GPU real, con NVIDIA, AMD, Intel o Apple. El script
+activa solo su entorno, así que se corre sin `--project`:
+
+```bash
+julia -t auto test/gpu/propagate_gpu.jl                # GPU por defecto: metal en macOS, cuda en el resto
+GPU=amdgpu julia -t auto test/gpu/propagate_gpu.jl     # otra GPU: cuda, amdgpu, oneapi o metal
+```
+
+| `GPU` | Paquete | Entorno | Archivo de backend | Probado en GPU real |
+|---|---|---|---|---|
+| `cuda` | CUDA.jl | `test/gpu/` | `backend_cuda.jl` | Sí (A30) |
+| `amdgpu` | AMDGPU.jl | `test/gpu/amdgpu/` | `backend_amdgpu.jl` | No |
+| `oneapi` | oneAPI.jl | `test/gpu/oneapi/` | `backend_oneapi.jl` | No |
+| `metal` | Metal.jl | `test/gpu/metal/` | `backend_metal.jl` | No |
+
+Todo lo que depende de la GPU (el backend, el nombre del dispositivo, la memoria y el chequeo de memoria dentro
+del kernel) está en el archivo de backend; el resto del script es igual para todas. Si una de esas funciones no
+anda en una GPU, el script imprime "could not be checked" o "(unknown)" y sigue. Imprime si la GPU soporta
+Float64: las de Apple y algunas de Intel no, y ahí todo se corre en Float32 (`propagate` da un error claro si se
+le pasa Float64).
+
 # Benchmarks
 
 Los tiempos (`@btime`) no son parte de los tests: están en `benchmark/benchmarks.jl`, con su propio

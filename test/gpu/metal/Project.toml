@@ -1,0 +1,14 @@
+[deps]
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+DiffEqGPU = "071ae1c0-96b5-11e9-1965-c90190d839ea"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+RayTracingGR = "4b51895e-7621-4f2b-bab6-efc159b47762"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[sources]
+RayTracingGR = {path = "../../.."}
