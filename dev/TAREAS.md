@@ -377,7 +377,22 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 
 ---
 
-- [ ] (2026-11-13, para: sin fecha) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hoy el campo se guarda pero nada lo usa. Objetivo del usuario: resolver tanto en CPU como en GPU con los métodos disponibles en cada caso.
+- [x] (2026-11-13, para: sin fecha; hecho 2026-11-19, sin commit) **Usar `configuration.backend` para elegir el integrador** (CPU / GPU). Hecho con `propagate` en `src/propagate/Solve/` (mismo patrón que `Callback/`). Detalle y mediciones en [PROPAGATE_2026-11-19.md](PROPAGATE_2026-11-19.md).
+
+  | Archivo | Cambio |
+  |---|---|
+  | `src/propagate/Solve/solve.jl` (nuevo) | `propagate(configuration, initial_data, region; alg, kwargs...)` → matriz `N × n` (column-major). Declara `default_algorithm` y `solve_ensemble`. Tolerancia `default_tolerance(T) = 5 eps(T)`. Opciones por defecto (se pueden cambiar): `abstol`, `reltol`, `adaptive = true`, `save_everystep = false`, `save_start = false`. Fijas: `trajectories`, `callback` (y en GPU `batch_size`, `merge_callbacks`): cambiarlas da `ArgumentError`. |
+  | `src/propagate/Solve/solve_cpu.jl` (nuevo) | `Vern9()` por defecto, `EnsembleThreads()`. Algoritmo de GPU con `CPU()` → `ArgumentError`. |
+  | `src/propagate/Solve/solve_gpu.jl` (nuevo) | `GPUTsit5()` por defecto, `EnsembleGPUKernel(backend)`, `batch_size = 50_000` (como Skylight-Pulsar), `merge_callbacks = true`. |
+  | `src/propagate/Callback/boundary_callback_gpu.jl` | Paso de Newton después de la bisección: `Δλ = -c / (∂_μ c k^μ)` (dual de ForwardDiff), `u ← u + Δλ f(u)`. Corte en Float32: de ~9 ulp a 1–3 ulp. |
+  | `src/RayTracingGR.jl` | Imports `Vern9`, `GPUTsit5`, `EnsembleGPUKernel`, `GPUODEAlgorithm`, `derivative`; `export propagate`. |
+  | `test/propagate/solve_tests.jl` (nuevo) | Valores por defecto; CPU Float64 con `Vern9`; Float32 con `Tsit5` (versión CPU de `GPUTsit5`); errores. |
+  | `test/propagate/callback_tests.jl` | El kernel de GPU deja el rayo a ≤ 3 ulp del borde. |
+
+  Decisiones del usuario (2026-11-19): el algoritmo se pasa como el de SciML/DiffEqGPU (`alg = Tsit5()`), sin tipos propios; CPU usa Float64 y Float32 es solo para GPU, pero no se prohíbe Float32 en CPU (los tests se separan por caso); `batch_size` solo en GPU y fijo; el registro de la corrida (método, tolerancias) queda en la aplicación. Tests: 166/166.
+- [ ] (2026-11-19, para: sin fecha) **Confirmar en la A30 el paso de Newton del callback de GPU** con `test/gpu/callback_gpu.jl`: que no haya alocaciones dentro del kernel (escape del integrador) y que el corte quede a 1–3 ulp. Probado solo con el kernel sobre la CPU. Script listo: `test/gpu/propagate_gpu.jl` (memoria en el kernel, corridas de 10⁴ a 10⁶ rayos con `propagate`, corte en ulp con y sin Newton, comparación con CPU Float64). En la notebook sin GPU: todo OK (2 y 3 ulp como máximo con 2000 y 20 000 rayos; sin Newton, 10 ulp). Correr en el cluster (el script activa su entorno `test/gpu/`): `julia -t auto test/gpu/propagate_gpu.jl` desde la raíz, o `julia -t auto propagate_gpu.jl` desde `test/gpu/`.
+
+  Texto original de la tarea:
 
   | Backend | Integradores | Ensemble | Paquete |
   |---|---|---|---|
@@ -450,3 +465,4 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-16: Instalación con `Pkg.add(url=...)` fallaba en un entorno con `PlotlyJS` (reportado por el usuario). Causa: el compat `DiffEqGPU = "3.21"` puesto hoy; DiffEqGPU ≥ 3.17 exige `Parameters` 0.13.1, y con eso `PlotlyBase` (de `PlotlyJS`) no tiene versión posible. Solo DiffEqGPU ≤ 3.16 convive con `PlotlyJS`. Compat bajado a `DiffEqGPU = "3.16"`. Verificado: el entorno del usuario (PlotlyJS + DataFrames + Parameters) instala RayTracingGR con DiffEqGPU 3.16.1; los 144 tests pasan con DiffEqGPU 3.16.1 y con 3.21.6; el callback de GPU no escapa con 3.16.1 (igual que la referencia). (Se agregó y luego se quitó del README una recomendación de entorno propio: el usuario quiere que funcione en el entorno global.) Formato nuevo, más claro, de la salida de `test/gpu/callback_gpu.jl`.
 - 2026-11-16: Prueba en la A30 OK con `boundary_callback(region, CUDABackend())` (10⁶ rayos, sin alocaciones en el kernel, igual que la CPU). Tarea para 2026-11-17: reordenar `src/propagate/Callback/` (no es modular). Documentación revisada: jerarquía de tipos del README con `AbstractRegion`/`PulsarRegion`, descripción de los tests de callback en CONTRIBUTING, estado del #16.
 - 2026-11-17: `src/propagate/Callback/` reordenado según el patrón de `spacetime/` (decisiones del usuario: `AbstractRegion` sigue en `propagate_types.jl`, regiones sin `module`, código repetido CPU/GPU aceptado porque nunca se usan los dos a la vez, tests sin cambios). `callback.jl` = índice con funciones genéricas vacías; `Region/PulsarRegion.jl`; `boundary_callback_cpu.jl`; `boundary_callback_gpu.jl` (código idéntico al anterior). `Pkg.test()` 144/144 OK. README: árbol y diagrama actualizados. Commit `65730b6` + push (WSL).
+- 2026-11-19: `propagate` (tarea del backend). Revisado el `solve` de Skylight-Pulsar (`Propagate/Utils_propagate.jl`): se respeta su estructura (CPU/GPU separados, `adaptive = true`, `save_everystep = false`, `batch_size = 50_000` en GPU, sin `dt`), con tolerancias nuevas. Mediciones fuera del repo (kernel de GPU sobre la CPU, púlsar KS a = 0.1 y 0.9): tolerancia `5 eps(T)`; CPU Float64 `Vern9`; GPU Float32 `GPUTsit5` (misma precisión que `GPUVern7`, `GPUVern9` peor); `Vern9` en Float32 deja rayos hasta 3.5e-3 del borde; paso de Newton en el callback de GPU (corte de ~9 a 1–3 ulp). Todo en `dev/PROPAGATE_2026-11-19.md`. `Pkg.test()` 166/166. README: uso de `propagate`, árbol y diagramas. Sin commit.

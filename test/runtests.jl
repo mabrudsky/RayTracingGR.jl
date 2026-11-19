@@ -8,4 +8,5 @@ using Test
     include("metric/boyer_lindquist_tests.jl")
     include("propagate/ensemble_tests.jl")
     include("propagate/callback_tests.jl")
+    include("propagate/solve_tests.jl")
 end

@@ -86,6 +86,9 @@ end
 
     @test all(on_border, r_cpu)                     # every ray stopped at R_in or R_out (CPU)
     @test all(on_border, r_gpu)                     # every ray stopped at R_in or R_out (GPU kernel)
+    # GPU kernel: bisection + Newton step leave the ray at most a few ulp from the border
+    ulps_from_border(r) = min(abs(r - region.R_in) / eps(region.R_in), abs(r - region.R_out) / eps(region.R_out))
+    @test maximum(ulps_from_border, r_gpu) <= 3
     @test count(r -> r < 10, r_cpu) == count(r -> r < 10, r_gpu)   # same rays hit the star
     @test any(r -> r < 10, r_cpu) && any(r -> r > 10, r_cpu)       # both borders are tested
     rel = maximum(maximum(abs.(cpu.u[i] .- gpu.u[i]) ./ max.(1, abs.(cpu.u[i]))) for i in 1:n)

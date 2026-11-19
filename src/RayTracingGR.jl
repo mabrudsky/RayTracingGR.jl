@@ -1,9 +1,11 @@
 module RayTracingGR
-    import ForwardDiff: Dual, Partials, partials
+    import ForwardDiff: Dual, Partials, partials, derivative
     using StaticArrays
     import KernelAbstractions as KA
     import SciMLBase
-    
+    import OrdinaryDiffEqVerner: Vern9
+    import DiffEqGPU: GPUTsit5, EnsembleGPUKernel, GPUODEAlgorithm
+
     include("RayTracing_types.jl")
     include("configuration/configuration.jl")
     include("spacetime/spacetime.jl")
@@ -17,5 +19,8 @@ module RayTracingGR
 
     # Export integration regions (callbacks)
     export PulsarRegion, boundary_callback
+
+    # Export propagation of the rays
+    export propagate
     
 end

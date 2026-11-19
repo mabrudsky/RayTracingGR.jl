@@ -48,6 +48,22 @@ g  = metric(bl, q)                                     # mismas funciones para c
 
 `M` y `a` tienen que ser los dos `Float32` o los dos `Float64`. Además, se exige `M ≥ 0` y `|a| ≤ M`.
 
+Propagar rayos (cada columna de `initial_data` es un rayo, `(t, x, y, z, kᵗ, kˣ, kʸ, kᶻ)`):
+
+```julia
+using RayTracingGR, StaticArrays, KernelAbstractions
+
+st     = Kerr.KerrSchildCoordinates(M = 1.0, a = 0.1)
+config = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.GeodesicEquationsVacuum(),
+                                    backend = CPU(), u0 = SVector{8}(initial_data[:, 1]), tspan = (0.0, 500.0))
+final  = propagate(config, initial_data, PulsarRegion(5.0, 50.0))     # matriz 8 × rayos con los estados finales
+final  = propagate(config, initial_data, PulsarRegion(5.0, 50.0); alg = Tsit5(), reltol = 1e-10)  # cambiar algoritmo u opciones
+```
+
+- `backend = CPU()` (Float64): `Vern9()` por defecto. GPU (`CUDABackend()`, ..., Float32): `GPUTsit5()` por defecto.
+- Tolerancias por defecto: `abstol = reltol = 5 eps(T)`. Más detalle en
+  [`dev/PROPAGATE_2026-11-19.md`](dev/PROPAGATE_2026-11-19.md).
+
 ## Convenciones
 
 | Elemento | Convención |
@@ -163,12 +179,16 @@ RayTracingGR.jl/
 │   │   ├── propagate_types.jl        # subtipos abstractos de propagación (AbstractRegion)
 │   │   ├── equations.jl              # RHS: geodésica y transporte paralelo
 │   │   ├── ensemble.jl               # tipos de ecuaciones, rhs + Ensemble_Problem
-│   │   └── Callback/
-│   │       ├── callback.jl           # punto de entrada: declara region_condition y boundary_callback + includes
-│   │       ├── Region/
-│   │       │   └── PulsarRegion.jl   # struct + constructores + region_condition
-│   │       ├── boundary_callback_cpu.jl  # CPU: ContinuousCallback + terminate!
-│   │       └── boundary_callback_gpu.jl  # GPU: DiscreteCallback + bisección (@inline, sin escape del integrador)
+│   │   ├── Callback/
+│   │   │   ├── callback.jl           # punto de entrada: declara region_condition y boundary_callback + includes
+│   │   │   ├── Region/
+│   │   │   │   └── PulsarRegion.jl   # struct + constructores + region_condition
+│   │   │   ├── boundary_callback_cpu.jl  # CPU: ContinuousCallback + terminate!
+│   │   │   └── boundary_callback_gpu.jl  # GPU: DiscreteCallback + bisección + paso de Newton (@inline)
+│   │   └── Solve/
+│   │       ├── solve.jl              # punto de entrada: propagate, tolerancia 5 eps(T), opciones por defecto
+│   │       ├── solve_cpu.jl          # CPU: Vern9() por defecto, EnsembleThreads()
+│   │       └── solve_gpu.jl          # GPU: GPUTsit5() por defecto, EnsembleGPUKernel(backend)
 │
 ├── test/
 │   ├── runtests.jl
@@ -180,10 +200,12 @@ RayTracingGR.jl/
 │   │                                 # igual a Kerr-Schild transformada, límite a = 0
 │   ├── propagate/
 │   │   ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
-│   │   └── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
+│   │   ├── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
+│   │   └── solve_tests.jl            # propagate: valores por defecto, Float64 (Vern9), Float32, errores
 │   └── gpu/                          # prueba en GPU real (se corre a mano, no en el CI)
 │       ├── Project.toml              # entorno propio (CUDA, DiffEqGPU, ...)
-│       └── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
+│       ├── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
+│       └── propagate_gpu.jl          # propagate en GPU: memoria, corte en ulp (con/sin Newton), comparación con CPU Float64
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)
@@ -192,7 +214,8 @@ RayTracingGR.jl/
 ├── docs/                             # Documenter.jl
 └── dev/
     ├── TAREAS.md                     # lista de tareas (fuente de verdad)
-    └── REVISION_2026-11-12.md        # revisión de código con soluciones propuestas
+    ├── REVISION_2026-11-12.md        # revisión de código con soluciones propuestas
+    └── PROPAGATE_2026-11-19.md       # mediciones: tolerancias, algoritmos y corte en el borde
 ```
 
 ## Cómo se cargan los archivos
@@ -221,6 +244,10 @@ flowchart TD
     E3 --> E33[boundary_callback_cpu.jl]
     E3 --> E34[boundary_callback_gpu.jl]
     E --> E4[ensemble.jl]
+    E --> E5[Solve/solve.jl]
+    E5 --> E51["function default_algorithm end<br/>function solve_ensemble end"]
+    E5 --> E52[solve_cpu.jl]
+    E5 --> E53[solve_gpu.jl]
 ```
 
 `metric`, `metric_inverse` y `christoffel` se declaran **una sola vez** en el módulo principal. Cada
@@ -232,7 +259,12 @@ funciones y el despacho múltiple elige la implementación correcta.
 Los callbacks siguen el mismo patrón: `Callback/callback.jl` declara `region_condition` y
 `boundary_callback`. Cada región (`Region/PulsarRegion.jl`) agrega su `region_condition`, y cada backend
 agrega su `boundary_callback`: `boundary_callback_cpu.jl` (`ContinuousCallback`) y
-`boundary_callback_gpu.jl` (`DiscreteCallback` + bisección).
+`boundary_callback_gpu.jl` (`DiscreteCallback` + bisección + un paso de Newton que deja el rayo sobre el
+borde).
+
+`Solve/solve.jl` sigue el mismo patrón: declara `default_algorithm` y `solve_ensemble`, y cada backend
+agrega su versión: `solve_cpu.jl` (`Vern9()`, `EnsembleThreads()`) y `solve_gpu.jl` (`GPUTsit5()`,
+`EnsembleGPUKernel(backend)`). `propagate` elige todo a partir de `configuration.backend`.
 
 ## Flujo de cálculo de un rayo
 
@@ -246,7 +278,12 @@ flowchart LR
     RHS --> CH["christoffel(spacetime, x)"]
     CH --> M["metric(spacetime, x::Dual)<br/>→ ∂g"]
     CH --> MI["metric_inverse(spacetime, x)<br/>→ g⁻¹"]
-    EP --> ENS["EnsembleProblem<br/>(DiffEqGPU)"]
+    EP --> ENS["EnsembleProblem"]
+    PR["propagate(configuration,<br/>initial_data, region)"] --> EP
+    PR --> CB["boundary_callback(region, backend)"]
+    ENS --> SOL["solve_ensemble<br/>CPU: Vern9 + EnsembleThreads<br/>GPU: GPUTsit5 + EnsembleGPUKernel"]
+    CB --> SOL
+    SOL --> OUT["estados finales<br/>(matriz N × rayos)"]
 ```
 
 ## Jerarquía de tipos
