@@ -8,6 +8,8 @@
 #   GPU           -> GPUTsit5()       EnsembleGPUKernel(backend) (solve_gpu.jl)    #
 # The algorithm and the options of solve can be changed with keywords, e.g.        #
 #   propagate(configuration, initial_data, region; alg = Tsit5(), reltol = 1e-10) #
+# All the arguments can also be given by name, like in Configuration:              #
+#   propagate(configuration = ..., initial_data = ..., region = ...)               #
 # trajectories and callback are set here; batch_size and merge_callbacks in        #
 # solve_gpu.jl. They can not be changed.                                           #
 # ================================================================================ #
@@ -50,3 +52,7 @@ function propagate(configuration::Configuration{N,T}, initial_data::AbstractMatr
     sol = solve_ensemble(ep, alg, configuration.backend, size(initial_data, 2), cb; options...)
     return stack(sol.u)   # N × n: final state of each ray, one column per ray
 end
+
+# Keywords, like Configuration: propagate(configuration = ..., initial_data = ..., region = ..., alg = ..., reltol = ...)
+propagate(; configuration::Configuration, initial_data::AbstractMatrix, region::AbstractRegion, kwargs...) =
+    propagate(configuration, initial_data, region; kwargs...)

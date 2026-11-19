@@ -333,10 +333,18 @@ Detalle en `REVISION_2026-11-12.md` §17–21. Agregados el 2026-11-12, sin fech
 
   derivando `christoffel` con Duales anidados (prueba también la AD de segundo orden) o con
   diferencias finitas. Es la prueba más fuerte de que la métrica es solución de las ecuaciones de Einstein.
-- [ ] #21 **Constantes de movimiento** a lo largo de una geodésica integrada (cadena completa:
+- [x] #21 (hecho 2026-11-19) **Constantes de movimiento** a lo largo de una geodésica integrada (cadena completa:
   métrica → $\Gamma$ → ecuaciones → solver). Comprobar $g_{\mu\nu} k^\mu k^\nu = 0$, $E = -k_t$,
   $L_z = x\,k_y - y\,k_x$ (índices bajos) y la constante de Carter. Depende de tener la propagación
   (`Ensemble_Problem` + `solve`) funcionando.
+
+  Hecho en `test/propagate/constants_of_motion_tests.jl` (decisión del usuario: todo en el test, la librería no
+  cambia; $Q$ es específica de Kerr). En Kerr-Schild, $p_\theta = \cot\theta\,(x\,k_x + y\,k_y) - r\sin\theta\,k_z$
+  (de $x + iy = (r + ia)\sin\theta\,e^{i\varphi}$) y
+  $Q = p_\theta^2 + \cos^2\theta\,(L_z^2/\sin^2\theta - a^2E^2)$. Cambio entre el principio y el final de cada rayo
+  (100 rayos del púlsar, $a = 0.1$ y $0.9$), medido: Float64 con `Vern9`: $\mathcal{N} \sim 5\times10^{-15}$,
+  $E \sim 2\times10^{-15}$, $L_z \sim 10^{-14}$, $Q \sim 10^{-13}$; Float32 con `Tsit5`: $\mathcal{N} \sim 2\times10^{-6}$,
+  $E \sim 10^{-6}$, $L_z \sim 3\times10^{-6}$, $Q \sim 10^{-4}$. Tolerancias del test ~10 veces más. Tests: 182/182.
 
 **Notas**
 - Para todos: evaluar varios puntos, incluyendo dentro del horizonte ($r < r_+$), cerca del eje y en
@@ -467,3 +475,5 @@ criterios locales (p. ej. Kretschmann / frecuencia para captura, radio de coorde
 - 2026-11-17: `src/propagate/Callback/` reordenado según el patrón de `spacetime/` (decisiones del usuario: `AbstractRegion` sigue en `propagate_types.jl`, regiones sin `module`, código repetido CPU/GPU aceptado porque nunca se usan los dos a la vez, tests sin cambios). `callback.jl` = índice con funciones genéricas vacías; `Region/PulsarRegion.jl`; `boundary_callback_cpu.jl`; `boundary_callback_gpu.jl` (código idéntico al anterior). `Pkg.test()` 144/144 OK. README: árbol y diagrama actualizados. Commit `65730b6` + push (WSL).
 - 2026-11-19: `propagate` (tarea del backend). Revisado el `solve` de Skylight-Pulsar (`Propagate/Utils_propagate.jl`): se respeta su estructura (CPU/GPU separados, `adaptive = true`, `save_everystep = false`, `batch_size = 50_000` en GPU, sin `dt`), con tolerancias nuevas. Mediciones fuera del repo (kernel de GPU sobre la CPU, púlsar KS a = 0.1 y 0.9): tolerancia `5 eps(T)`; CPU Float64 `Vern9`; GPU Float32 `GPUTsit5` (misma precisión que `GPUVern7`, `GPUVern9` peor); `Vern9` en Float32 deja rayos hasta 3.5e-3 del borde; paso de Newton en el callback de GPU (corte de ~9 a 1–3 ulp). Todo en `dev/PROPAGATE_2026-11-19.md`. `Pkg.test()` 166/166. README: uso de `propagate`, árbol y diagramas. Commit `d4d50c6` + push (WSL).
 - 2026-11-19: Prueba de `propagate` en la A30 con `test/gpu/propagate_gpu.jl`: todo OK (sin memoria en el kernel; 10⁶ rayos con 0 sin cortar y ≤ 3 ulp del borde; coincide con CPU Float64). La sesión de Jupyter vio 6 GiB de la A30.
+- 2026-11-19: #21 hecho (`test/propagate/constants_of_motion_tests.jl`, 182/182). Benchmark nuevo `benchmark/integration_step.jl` (decisiones del usuario: desglose por niveles, barras, CairoMakie; entorno `benchmark/` + CairoMakie, OrdinaryDiffEqVerner, SciMLBase, KernelAbstractions, Printf) y gráfico `benchmark/integration_step.png` en la sección nueva "Rendimiento" del README. Medido (Ultra 7 155H, 22 hilos, Float64, KS a = 0.9): metric 8 ns, metric_inverse 9 ns, christoffel 79 ns; f(u) 105 / 192 ns (geodésica / transporte); paso de Vern9 1.8 / 2.8 µs; paso en propagate 4.7 / 6.0 µs (1 rayo) y 1.3 / 1.8 µs por rayo con 22 hilos. Exportados `Configuration`, `GeodesicEquationsVacuum`, `ParallelTransportEquationsVacuum` (pedido del usuario: el prefijo solo para el espacio-tiempo, `Kerr.KerrSchildCoordinates`). `propagate` también acepta los argumentos con nombre (`propagate(configuration = ..., initial_data = ..., region = ...)`), como `Configuration`; ejemplo del README con los campos alineados. Tests 184/184. Sin commit.
+- 2026-11-19: `benchmark/integration_step.jl` rehecho a pedido del usuario (el desglose por niveles confundía): ahora mide, dado un estado u_n, el costo de obtener u_{n+1} (un paso completo de Vern9 con control del error y chequeo del borde, igual que en la simulación), repitiendo `step!` desde el mismo u_n con @benchmark en 7 estados de un rayo del púlsar (KS a = 0.9). Con cargador: geodésica 4.3–4.8 µs por paso (5 corridas), transporte paralelo 5.9–6.0 µs; trayectoria de ~73 pasos ≈ 0.33 ms; costo fijo de `propagate` ≈ 18 µs por llamada. El costo no depende del estado ni del paso. Gráfico y sección "Rendimiento" del README actualizados. Sin commit.

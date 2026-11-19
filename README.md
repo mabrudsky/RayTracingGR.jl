@@ -52,12 +52,29 @@ Propagar rayos (cada columna de `initial_data` es un rayo, `(t, x, y, z, kᵗ, k
 
 ```julia
 using RayTracingGR, StaticArrays, KernelAbstractions
+using OrdinaryDiffEqTsit5   # solo para el segundo ejemplo (alg = Tsit5())
 
 st     = Kerr.KerrSchildCoordinates(M = 1.0, a = 0.1)
-config = RayTracingGR.Configuration(spacetime = st, equations = RayTracingGR.GeodesicEquationsVacuum(),
-                                    backend = CPU(), u0 = SVector{8}(initial_data[:, 1]), tspan = (0.0, 500.0))
-final  = propagate(config, initial_data, PulsarRegion(5.0, 50.0))     # matriz 8 × rayos con los estados finales
-final  = propagate(config, initial_data, PulsarRegion(5.0, 50.0); alg = Tsit5(), reltol = 1e-10)  # cambiar algoritmo u opciones
+config = Configuration(spacetime = st,
+                       equations = GeodesicEquationsVacuum(),
+                       backend   = CPU(),
+                       u0        = SVector{8}(initial_data[:, 1]),
+                       tspan     = (0.0, 500.0))
+region = PulsarRegion(R_in = 5.0, R_out = 50.0)
+
+# Matriz 8 × rayos con los estados finales (una columna por rayo)
+final = propagate(configuration = config,
+                  initial_data  = initial_data,
+                  region        = region)
+
+# Cambiar el algoritmo o las opciones de solve
+final = propagate(configuration = config,
+                  initial_data  = initial_data,
+                  region        = region,
+                  alg           = Tsit5(),
+                  reltol        = 1e-10)
+
+# También sin nombres: propagate(config, initial_data, region; alg = Tsit5())
 ```
 
 - `backend = CPU()` (Float64): `Vern9()` por defecto. GPU (`CUDABackend()`, ..., Float32): `GPUTsit5()` por defecto.
@@ -148,6 +165,44 @@ Todo el código que corre dentro de un kernel de GPU sigue estas reglas:
 
 ---
 
+# Rendimiento
+
+¿Cuánto cuesta, dado un estado $u_n$ de un rayo, obtener el siguiente $u_{n+1}$? Es un paso de integración
+completo, igual al que hace la simulación entre dos estados: las 16 evaluaciones del lado derecho $f(u)$
+de `Vern9`, la combinación de las etapas, el control del error (tolerancia $5\,\varepsilon_{\text{Float64}}$)
+y el chequeo del borde del callback.
+
+![Costo de un paso de integración en CPU](benchmark/integration_step.png)
+
+| CPU, Float64 | Un paso $u_n \to u_{n+1}$ | Una trayectoria completa (emisión → borde) |
+|---|---|---|
+| Geodésica | $\approx 4.5\ \mu\text{s}$ | $\approx 73$ pasos $\to \approx 0.33\ \text{ms}$ |
+| Transporte paralelo | $\approx 6.0\ \mu\text{s}$ | $\approx 68$ pasos $\to \approx 0.41\ \text{ms}$ |
+
+Cómo se mide (`benchmark/integration_step.jl`, BenchmarkTools):
+
+1. Se integra un rayo del púlsar en Kerr-Schild ($a = 0.9$, $5 < r < 50$) y se guarda cada estado $u_n$
+   con el tamaño de paso $h_n$ que usó la simulación.
+2. Para 7 estados a lo largo del rayo, desde la emisión hasta el borde, `@benchmark` repite muchas veces
+   el mismo paso $u_n \to u_{n+1}$. Rearmar el integrador antes de cada repetición no se cuenta.
+3. La barra es la mediana; los puntos son los 7 estados. El costo no depende de dónde está el rayo ni del
+   tamaño del paso.
+
+Notas:
+
+- Entre corridas el resultado varía un ~10 % (geodésica: $4.3$ a $4.8\ \mu\text{s}$).
+- Una trayectoria tarda (pasos) $\times$ (costo de un paso), más un costo fijo de $\approx 18\ \mu\text{s}$
+  por cada llamada a `propagate` (armar el problema y devolver el resultado), que se reparte entre todos
+  los rayos de la llamada.
+
+Para volver a medir y regenerar el gráfico:
+
+```bash
+julia --project=benchmark benchmark/integration_step.jl
+```
+
+---
+
 # Estructura del proyecto
 
 ## Carpetas y archivos
@@ -201,7 +256,8 @@ RayTracingGR.jl/
 │   ├── propagate/
 │   │   ├── ensemble_tests.jl         # chequeos de Ensemble_Problem, ecuaciones sin alocar
 │   │   ├── callback_tests.jl         # corte del púlsar en CPU y en el kernel de GPU
-│   │   └── solve_tests.jl            # propagate: valores por defecto, Float64 (Vern9), Float32, errores
+│   │   ├── solve_tests.jl            # propagate: valores por defecto, Float64 (Vern9), Float32, errores
+│   │   └── constants_of_motion_tests.jl  # 𝒩, E, L_z y Carter Q se conservan a lo largo de los rayos
 │   └── gpu/                          # prueba en GPU real (se corre a mano, no en el CI)
 │       ├── Project.toml              # entorno propio (CUDA, DiffEqGPU, ...)
 │       ├── callback_gpu.jl           # boundary_callback en GPU: escala, memoria, comparación con CPU
@@ -209,7 +265,9 @@ RayTracingGR.jl/
 │
 ├── benchmark/
 │   ├── Project.toml                  # entorno propio (BenchmarkTools)
-│   └── benchmarks.jl                 # tiempos con @btime (se corre a mano)
+│   ├── benchmarks.jl                 # tiempos con @btime (se corre a mano)
+│   ├── integration_step.jl           # costo de un paso u_n → u_{n+1} en CPU (@benchmark) + gráfico
+│   └── integration_step.png          # gráfico de la sección "Rendimiento"
 │
 ├── docs/                             # Documenter.jl
 └── dev/

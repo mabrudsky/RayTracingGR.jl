@@ -46,6 +46,11 @@ null_condition(spacetime, final) =
     final_tsit5 = propagate(cfg, data, region; alg = Tsit5(), reltol = 1e-8, abstol = 1e-8)
     @test size(final_tsit5) == (8, n)
     @test maximum(abs.(final_tsit5 .- final) ./ max.(abs.(final), 1)) < 1e-5
+
+    # Same call with every argument given by name, like Configuration
+    @test propagate(configuration = cfg, initial_data = data, region = region) == final
+    @test propagate(configuration = cfg, initial_data = data, region = region,
+                    alg = Tsit5(), reltol = 1e-8, abstol = 1e-8) == final_tsit5
 end
 
 @testset "propagate - Float32 (Tsit5)" begin

@@ -42,7 +42,9 @@ julia --project=. -e "using Pkg; Pkg.test()"
 | `test/metric/christoffel_tests_BoyerLindquistCoordinates.jl` | ∇g = 0 en Boyer-Lindquist (Float64 y Float32), con tolerancia relativa al tamaño de la métrica. |
 | `test/metric/boyer_lindquist_tests.jl` | Constructores, isbits y cero alocaciones; $g\,g^{-1} = I$; $\det g = -\Sigma^2\sin^2\theta$; igual a Kerr-Schild transformada; mismo `coordinate_radius` en los dos sistemas; límite $a = 0$ (Schwarzschild). |
 | `test/propagate/ensemble_tests.jl` | Los chequeos de `Ensemble_Problem` (largo de `u0`, precisión, filas y tipo de `initial_data`, `initial_data` en la CPU) y que las ecuaciones no aloquen memoria. |
-| `test/propagate/callback_tests.jl` | `PulsarRegion` (constructores, isbits, condición en Kerr-Schild y Boyer-Lindquist) y el corte con `boundary_callback(region, backend)`: con `CPU()` devuelve un `ContinuousCallback` y con un backend de GPU un `DiscreteCallback` (isbits). Rayos integrados con `Tsit5` + la versión de CPU y con `GPUTsit5` en `EnsembleGPUKernel(CPU())` + la versión de GPU (el código del kernel de GPU, ejecutado en la CPU); todos terminan en $R_\text{in}$ o $R_\text{out}$ y los dos dan el mismo estado final. |
+| `test/propagate/callback_tests.jl` | `PulsarRegion` (constructores, isbits, condición en Kerr-Schild y Boyer-Lindquist) y el corte con `boundary_callback(region, backend)`: con `CPU()` devuelve un `ContinuousCallback` y con un backend de GPU un `DiscreteCallback` (isbits). Rayos integrados con `Tsit5` + la versión de CPU y con `GPUTsit5` en `EnsembleGPUKernel(CPU())` + la versión de GPU (el código del kernel de GPU, ejecutado en la CPU); todos terminan en $R_\text{in}$ o $R_\text{out}$ y los dos dan el mismo estado final; el kernel de GPU deja cada rayo a $\leq 3$ ulp del borde (paso de Newton). |
+| `test/propagate/solve_tests.jl` | `propagate`: valores por defecto (`Vern9` en CPU, `GPUTsit5` en GPU, tolerancia $5\,\varepsilon_T$); CPU Float64 con `Vern9` (borde $< 10^{-10}$, condición nula $< 10^{-12}$); Float32 con `Tsit5`; cambio de algoritmo y opciones; errores por algoritmo incompatible con el backend u opciones internas. |
+| `test/propagate/constants_of_motion_tests.jl` | Cadena completa (métrica → Christoffel → ecuaciones → solver → callback): $g_{\mu\nu}k^\mu k^\nu = 0$, $E = -k_t$, $L_z = x\,k_y - y\,k_x$ y la constante de Carter $Q$ se conservan entre el principio y el final de cada rayo ($a = 0.1$ y $0.9$; Float64 con `Vern9` y Float32 con `Tsit5`). |
 
 Las alocaciones se miden dentro de una función: medidas en el ámbito global (o con un alias global
 no constante) dan resultados falsos.
@@ -86,7 +88,12 @@ entorno, y se corren a mano.
 # desde la carpeta del proyecto (la primera vez: instantiate)
 julia --project=benchmark -e "using Pkg; Pkg.instantiate()"
 julia --project=benchmark benchmark/benchmarks.jl
+julia --project=benchmark benchmark/integration_step.jl   # costo de un paso u_n → u_{n+1} + gráfico
 ```
+
+`benchmark/integration_step.jl` mide con `@benchmark` cuánto cuesta, dado un estado $u_n$, obtener $u_{n+1}$ en CPU (Float64),
+y regenera `benchmark/integration_step.png`, el gráfico de la sección "Rendimiento" del
+README.
 
 En Julia 1.10, `benchmark/Project.toml` no reconoce la sección `[sources]`: la primera vez hay que
 correr `Pkg.develop(path = ".")` con `--project=benchmark` en lugar de `Pkg.instantiate()`.

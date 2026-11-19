@@ -20,7 +20,8 @@ module RayTracingGR
     # Export integration regions (callbacks)
     export PulsarRegion, boundary_callback
 
-    # Export propagation of the rays
+    # Export configuration, equation sets and propagation of the rays
+    export Configuration, GeodesicEquationsVacuum, ParallelTransportEquationsVacuum
     export propagate
     
 end

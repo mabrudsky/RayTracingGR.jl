@@ -9,4 +9,5 @@ using Test
     include("propagate/ensemble_tests.jl")
     include("propagate/callback_tests.jl")
     include("propagate/solve_tests.jl")
+    include("propagate/constants_of_motion_tests.jl")
 end
