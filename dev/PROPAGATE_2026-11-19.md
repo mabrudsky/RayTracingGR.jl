@@ -232,6 +232,23 @@ $\text{abstol} = \text{reltol} = 5\,\varepsilon_T$, `adaptive = true`, `save_eve
 
 ## 5.2 Decisiones
 
-1. **Paso de Newton en el callback de GPU**: implementado. Falta confirmarlo en la A30.
+1. **Paso de Newton en el callback de GPU**: implementado y confirmado en la A30 (sección 5.3).
 2. **Float32 en CPU**: no se prohíbe (la CPU se usa con Float64 y Float32 es para la GPU, pero usar Float32
    en CPU no rompe nada). Los tests se separan por caso.
+
+## 5.3 Prueba en la A30
+
+`test/gpu/propagate_gpu.jl` (DiffEqGPU 3.21.6, CUDA.jl 6.4.2, Julia 1.12.6), Float32, `GPUTsit5`,
+tolerancia $5\,\varepsilon_{\text{Float32}}$:
+
+| rayos | caen a la estrella | escapan | sin cortar | $d$ (p99) | $d$ (máx.) | tiempo |
+|---|---|---|---|---|---|---|
+| $10^4$ | 871 | 9129 | 0 | $1\,\operatorname{ulp}$ | $3\,\operatorname{ulp}$ | $0.007\ \text{s}$ |
+| $10^5$ | 8897 | 91103 | 0 | $1\,\operatorname{ulp}$ | $3\,\operatorname{ulp}$ | $0.28\ \text{s}$ |
+| $10^6$ | 89189 | 910811 | 0 | $1\,\operatorname{ulp}$ | $3\,\operatorname{ulp}$ | $0.91\ \text{s}$ |
+
+- El código de GPU no pide memoria dentro del kernel: el paso de Newton no hace escapar al integrador.
+- Contra la CPU en Float64 (`Vern9`, $10^4$ rayos): todos terminan en el mismo borde; diferencia relativa
+  mediana $3.1 \times 10^{-7}$ y p99 $8.7 \times 10^{-6}$; ningún rayo con diferencia $> 10^{-3}$.
+- Antes del paso de Newton (prueba del 2026-11-16), con $10^6$ rayos el peor rayo quedaba a
+  $4.6 \times 10^{-5} \approx 12\,\operatorname{ulp}$ del borde.
